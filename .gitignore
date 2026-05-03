@@ -1,0 +1,58 @@
+# Python cache
+__pycache__/
+_pycache__/
+_pycache_/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.*
+
+# VS Code settings
+.vscode/
+
+# PyCharm
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+# Test / coverage cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Pygame / local temp files
+*.log
+*.tmp
+
+# Large exported files
+*.zip
+*.rar
+*.7z
+
+# Video recordings
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# Audio project files
+*.aup3
+
+# Backup files
+*.bak
+*.backup
