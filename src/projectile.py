@@ -3,7 +3,6 @@ import math
 import pygame
 
 from settings import (
-    PROJECTILE_LIFETIME,
     SHIELD_RETURN_SPEED,
     SHIELD_THROW_CAN_HIT_ON_RETURN,
     SHIELD_THROW_HIT_COOLDOWN,
@@ -19,35 +18,33 @@ class Projectile:
         self,
         x,
         y,
-        width,
-        height,
-        vel_x,
-        vel_y,
+        direction,
         damage,
         is_critical,
-        projectile_gravity=0,
-        projectile_type="shooter",
+        speed,
+        max_distance=350,
+        projectile_type="weapon",
     ):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.vel_x = vel_x
-        self.vel_y = vel_y
+        self.rect = pygame.Rect(x, y, 16, 10)
+        self.start_x = x
+        self.start_y = y
+        self.direction = direction
+        self.speed = speed
+        self.max_distance = max_distance
         self.damage = damage
         self.is_critical = is_critical
-        self.projectile_gravity = projectile_gravity
-        self.lifetime = PROJECTILE_LIFETIME
-        self.alive = True
         self.projectile_type = projectile_type
+        self.alive = True
+        self.has_hit = False
 
     def update(self, dt, platforms=None):
         if not self.alive:
             return
 
-        self.rect.x += self.vel_x
-        self.vel_y += self.projectile_gravity
-        self.rect.y += self.vel_y
-        self.lifetime -= dt
+        self.rect.x += self.direction * self.speed
 
-        if self.lifetime <= 0:
+        distance = abs(self.rect.x - self.start_x)
+        if distance >= self.max_distance:
             self.alive = False
 
         if platforms is None:

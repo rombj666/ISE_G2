@@ -32,7 +32,7 @@ WEAPONS = {
         "height": 10,
         "effect": "projectile",
         "projectile_speed": 9,
-        "projectile_gravity": 0.15,
+        "projectile_gravity": 0,
     },
     "shield_weapon": {
         "id": "shield_weapon",

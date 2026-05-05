@@ -9,18 +9,37 @@ from settings import (
     FPS,
     FULCRUM_INTERACT_DISTANCE,
     FULCRUM_RADIUS,
+    ENERGY_BEAM_DAMAGE,
+    ENERGY_BEAM_HEIGHT,
+    ENERGY_BEAM_RANGE,
+    EXECUTE_HP_THRESHOLD,
+    EXECUTE_PARRY_WINDOW,
+    EXECUTE_RANGE,
     NORMAL_PARRY_STUN_TIME,
+    ORBIT_BLADE_COUNT,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
+    SOUL_ANCHOR_DURATION,
+    SOUL_ANCHOR_RETURN_COST,
+    TIME_FREEZE_DURATION,
     TITLE,
     WEAPON_SPECIAL_COOLDOWN,
 )
 from src.coin import Coin
 from src.combat import calculate_damage
 from src.enemy import Enemy
+from src.level_manager import LevelManager
 from src.player import Player
 from src.projectile import Projectile, ReturningShield
-from src.ui import draw_player_ui, draw_weapon_boxes
+from src.shop import Shop
+from src.skills import (
+    EnergyBeamEffect,
+    OrbitBlade,
+    SkillCircleEffect,
+    TimeFreezeDomain,
+    get_skill,
+)
+from src.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
 from src.weapons import get_weapon
 
 
@@ -31,26 +50,24 @@ def main():
     pygame.display.set_caption(TITLE)
     clock = pygame.time.Clock()
 
+    level_manager = LevelManager()
     player = Player(100, 500)
-    enemy = Enemy(700, 590)
+    enemy = Enemy(0, 0)
+    level_manager.change_room(0, player, enemy)
+    room_0_shop_rect = level_manager.rooms[0].get_shop_rect()
+    shop = Shop(
+        room_0_shop_rect.x,
+        room_0_shop_rect.y,
+        room_0_shop_rect.width,
+        room_0_shop_rect.height,
+    )
+
     coins = []
     projectiles = []
     returning_shields = []
-
-    platforms = [
-        pygame.Rect(0, 650, 1280, 70),
-        pygame.Rect(300, 520, 200, 30),
-        pygame.Rect(650, 430, 220, 30),
-    ]
-
-    fulcrums = [
-        {
-            "rect": pygame.Rect(420, 560, FULCRUM_RADIUS * 2, FULCRUM_RADIUS * 2),
-            "anchor": (434, 574),
-            "target": (780, 398),
-            "used": False,
-        }
-    ]
+    time_freeze_domains = []
+    active_orbit_blades = []
+    active_skill_effects = []
 
     u_was_pressed = False
     grapple_special_hitbox = None
@@ -60,53 +77,119 @@ def main():
     while running:
         dt = clock.tick(FPS) / 1000
         e_pressed = False
+        k_pressed = False
+        current_room = level_manager.get_current_room()
+        shop_active = current_room.room_id == 0
+
+        if not shop_active and shop.is_open:
+            shop.close()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-                e_pressed = True
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_F1:
+                    player.toggle_unlimited_hp()
+
+                if event.key == pygame.K_F2:
+                    player.toggle_unlimited_mana()
+
+                if event.key == pygame.K_e:
+                    if shop_active and shop.can_interact(player):
+                        shop.toggle()
+                    else:
+                        e_pressed = True
+
+                if event.key == pygame.K_k:
+                    k_pressed = True
+
+                if shop.is_open:
+                    shop.handle_key(event, player)
 
         keys = pygame.key.get_pressed()
+        platforms = level_manager.get_current_platforms()
+        fulcrums = level_manager.get_current_fulcrums()
 
-        if grapple_special_timer > 0:
-            grapple_special_timer -= dt
-        else:
-            grapple_special_hitbox = None
+        if not shop.is_open:
+            if grapple_special_timer > 0:
+                grapple_special_timer -= dt
+            else:
+                grapple_special_hitbox = None
 
-        enemy.update(dt, player)
+            for domain in time_freeze_domains:
+                domain.update(dt, enemy)
+            time_freeze_domains = [domain for domain in time_freeze_domains if domain.alive]
 
-        if not player.is_dead:
+            enemy.update(dt, player)
+
+        if not player.is_dead and not shop.is_open:
             player.handle_input(keys)
             player.update(dt, platforms, keys)
+            room_changed = False
+            target_room_id = level_manager.check_room_exit(player)
+
+            if target_room_id is not None:
+                room_changed = level_manager.change_room(target_room_id, player, enemy)
+
+                if room_changed:
+                    coins.clear()
+                    projectiles.clear()
+                    returning_shields.clear()
+                    time_freeze_domains.clear()
+                    active_orbit_blades.clear()
+                    active_skill_effects.clear()
+                    player.has_active_shield_throw = False
+                    grapple_special_hitbox = None
+                    grapple_special_timer = 0
+                    u_was_pressed = False
+                    platforms = level_manager.get_current_platforms()
+                    fulcrums = level_manager.get_current_fulcrums()
+
+                    if level_manager.get_current_room().room_id != 0:
+                        shop.close()
+
+            if k_pressed and not room_changed:
+                activate_current_skill(
+                    player,
+                    enemy,
+                    time_freeze_domains,
+                    active_orbit_blades,
+                    active_skill_effects,
+                )
 
             nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
 
-            if e_pressed and nearby_fulcrum is not None:
+            if e_pressed and nearby_fulcrum is not None and not room_changed:
                 player.start_auto_grapple(nearby_fulcrum["anchor"], nearby_fulcrum["target"])
 
-            if player.should_spawn_projectile:
+            if player.should_spawn_projectile and not room_changed:
                 spawn_projectile(player, projectiles)
                 player.should_spawn_projectile = False
 
-            handle_player_attack(player, enemy)
-            new_special_hitbox = handle_weapon_special(
-                keys,
-                player,
-                enemy,
-                returning_shields,
-                u_was_pressed,
-            )
+            if not room_changed:
+                handle_player_attack(player, enemy)
+                new_special_hitbox = handle_weapon_special(
+                    keys,
+                    player,
+                    enemy,
+                    returning_shields,
+                    u_was_pressed,
+                )
+            else:
+                new_special_hitbox = None
 
             if new_special_hitbox is not None:
                 grapple_special_hitbox = new_special_hitbox
                 grapple_special_timer = 0.12
 
-            u_was_pressed = keys[pygame.K_u]
+            if not room_changed:
+                u_was_pressed = keys[pygame.K_u]
 
             update_projectiles(projectiles, dt, platforms, enemy)
             update_returning_shields(returning_shields, dt, enemy)
+            update_orbit_blades(active_orbit_blades, dt, player, enemy)
             returning_shields = [shield for shield in returning_shields if shield.alive]
+            active_orbit_blades = [blade for blade in active_orbit_blades if blade.alive]
             player.has_active_shield_throw = len(returning_shields) > 0
             handle_enemy_attack(player, enemy)
             handle_enemy_coin_drop(enemy, coins)
@@ -114,10 +197,20 @@ def main():
             coins = [coin for coin in coins if not coin.collected]
             projectiles = [projectile for projectile in projectiles if projectile.alive]
 
+        if not shop.is_open:
+            for effect in active_skill_effects:
+                effect.update(dt)
+            active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
+
         screen.fill((18, 20, 30))
 
-        for platform in platforms:
-            pygame.draw.rect(screen, (120, 120, 130), platform)
+        level_manager.draw_current_room(screen)
+
+        current_room = level_manager.get_current_room()
+        shop_active = current_room.room_id == 0
+
+        if shop_active:
+            shop.draw_shop_area(screen)
 
         for fulcrum in fulcrums:
             pygame.draw.circle(screen, (150, 80, 230), fulcrum["anchor"], FULCRUM_RADIUS)
@@ -131,6 +224,15 @@ def main():
 
         for shield in returning_shields:
             shield.draw(screen)
+
+        for domain in time_freeze_domains:
+            domain.draw(screen)
+
+        for blade in active_orbit_blades:
+            blade.draw(screen)
+
+        for effect in active_skill_effects:
+            effect.draw(screen)
 
         enemy.draw(screen)
         player.draw(screen)
@@ -149,8 +251,18 @@ def main():
         if nearby_fulcrum is not None and not player.is_auto_grappling:
             draw_interaction_text(screen, player)
 
-        draw_player_ui(screen, player)
+        if shop_active and shop.can_interact(player) and not shop.is_open:
+            draw_shop_interaction_text(screen, shop)
+
+        draw_player_ui(screen, player, level_manager.get_current_room().name)
         draw_weapon_boxes(screen, player)
+        draw_skill_boxes(screen, player)
+
+        if level_manager.get_current_room().room_id == 3:
+            draw_level_complete_text(screen)
+
+        if shop.is_open:
+            shop.draw_shop_menu(screen, player)
 
         if player.is_dead:
             font = pygame.font.Font(None, 72)
@@ -171,24 +283,15 @@ def spawn_projectile(player, projectiles):
 
     damage, is_critical = calculate_damage(player, weapon["damage"])
 
-    if player.facing == 1:
-        x = player.rect.right
-    else:
-        x = player.rect.left - weapon["width"]
-
-    y = player.rect.centery - weapon["height"] // 2
-    vel_x = weapon["projectile_speed"] * player.facing
-
     projectile = Projectile(
-        x,
-        y,
-        weapon["width"],
-        weapon["height"],
-        vel_x,
-        0,
+        player.rect.centerx,
+        player.rect.centery,
+        player.facing,
         damage,
         is_critical,
-        weapon["projectile_gravity"],
+        weapon.get("projectile_speed", 12),
+        weapon.get("projectile_max_distance", 350),
+        "weapon",
     )
     projectiles.append(projectile)
 
@@ -303,6 +406,133 @@ def update_returning_shields(returning_shields, dt, enemy):
         shield.check_enemy_collision(enemy)
 
 
+def update_orbit_blades(active_orbit_blades, dt, player, enemy):
+    for blade in active_orbit_blades:
+        blade.update(dt, player, enemy)
+
+
+def activate_current_skill(
+    player,
+    enemy,
+    time_freeze_domains,
+    active_orbit_blades,
+    active_skill_effects,
+):
+    skill = get_skill(player.current_skill_id)
+
+    if skill["skill_type"] == "soul_anchor" and player.soul_anchor_active:
+        activate_soul_anchor(player, skill, active_skill_effects)
+        return
+
+    if not player.can_use_skill(skill):
+        print("Cannot use skill")
+        return
+
+    if skill["skill_type"] == "time_freeze":
+        player.spend_skill_cost(skill)
+        time_freeze_domains.append(TimeFreezeDomain(player.rect.center, TIME_FREEZE_DURATION))
+        print("Time Freeze")
+
+    elif skill["skill_type"] == "orbit_blades":
+        player.spend_skill_cost(skill)
+        for index in range(ORBIT_BLADE_COUNT):
+            active_orbit_blades.append(OrbitBlade(player, index, ORBIT_BLADE_COUNT))
+        print("Orbit Blades")
+
+    elif skill["skill_type"] == "energy_beam":
+        player.spend_skill_cost(skill)
+        beam_rect = get_energy_beam_rect(player)
+        if enemy.alive and beam_rect.colliderect(enemy.rect):
+            enemy.take_damage(ENERGY_BEAM_DAMAGE)
+            print("Energy Beam hit enemy")
+        active_skill_effects.append(EnergyBeamEffect(beam_rect))
+
+    elif skill["skill_type"] == "execute":
+        activate_execute_strike(player, enemy, skill, active_skill_effects)
+
+    elif skill["skill_type"] == "soul_anchor":
+        activate_soul_anchor(player, skill, active_skill_effects)
+
+
+def get_energy_beam_rect(player):
+    y = player.rect.centery - ENERGY_BEAM_HEIGHT // 2
+
+    if player.facing == 1:
+        x = player.rect.right
+    else:
+        x = player.rect.left - ENERGY_BEAM_RANGE
+
+    return pygame.Rect(x, y, ENERGY_BEAM_RANGE, ENERGY_BEAM_HEIGHT)
+
+
+def activate_execute_strike(player, enemy, skill, active_skill_effects):
+    target = get_enemy_in_front(player, enemy, EXECUTE_RANGE)
+
+    if target is None:
+        print("Enemy is not executable")
+        return
+
+    hp_is_low = target.current_hp <= target.max_hp * EXECUTE_HP_THRESHOLD
+    if not hp_is_low and not target.is_executable:
+        print("Enemy is not executable")
+        return
+
+    player.spend_skill_cost(skill)
+    target.execute()
+    active_skill_effects.append(SkillCircleEffect(target.rect.center, 42, (255, 80, 40)))
+    print("Executed enemy")
+
+
+def get_enemy_in_front(player, enemy, skill_range):
+    if not enemy.alive:
+        return None
+
+    if player.facing == 1 and enemy.rect.centerx < player.rect.centerx:
+        return None
+
+    if player.facing == -1 and enemy.rect.centerx > player.rect.centerx:
+        return None
+
+    distance = math.hypot(
+        enemy.rect.centerx - player.rect.centerx,
+        enemy.rect.centery - player.rect.centery,
+    )
+    if distance <= skill_range:
+        return enemy
+
+    return None
+
+
+def activate_soul_anchor(player, skill, active_skill_effects):
+    if player.is_dead or player.is_auto_grappling:
+        return
+
+    if player.soul_anchor_active:
+        if not player.debug_unlimited_mana and player.current_mana < SOUL_ANCHOR_RETURN_COST:
+            print("Not enough mana to return")
+            return
+
+        if not player.debug_unlimited_mana:
+            player.current_mana -= SOUL_ANCHOR_RETURN_COST
+
+        player.rect.center = player.soul_anchor_pos
+        player.vel_x = 0
+        player.vel_y = 0
+        player.soul_anchor_active = False
+        player.soul_anchor_pos = None
+        player.soul_anchor_timer = 0
+        active_skill_effects.append(SkillCircleEffect(player.rect.center, 34, (120, 255, 180)))
+        print("Returned to Soul Anchor")
+        return
+
+    player.spend_skill_cost(skill)
+    player.soul_anchor_active = True
+    player.soul_anchor_pos = player.rect.center
+    player.soul_anchor_timer = SOUL_ANCHOR_DURATION
+    active_skill_effects.append(SkillCircleEffect(player.soul_anchor_pos, 28, (120, 255, 180)))
+    print("Soul Anchor placed")
+
+
 def handle_enemy_attack(player, enemy):
     if not enemy.is_attacking or not enemy.alive:
         return
@@ -323,8 +553,10 @@ def handle_enemy_attack(player, enemy):
         print("Blocked")
     elif player.is_parrying:
         enemy.stun(NORMAL_PARRY_STUN_TIME)
+        enemy.mark_executable(EXECUTE_PARRY_WINDOW)
         enemy.attack_has_hit = True
         print("Parried")
+        print("Perfect parry: enemy executable")
     else:
         player.take_damage(ENEMY_DAMAGE)
         enemy.attack_has_hit = True
@@ -372,6 +604,20 @@ def draw_interaction_text(screen, player):
     font = pygame.font.Font(None, 30)
     text = font.render("Press E to grapple", True, (235, 225, 255))
     text_rect = text.get_rect(midbottom=(player.rect.centerx, player.rect.top - 12))
+    screen.blit(text, text_rect)
+
+
+def draw_shop_interaction_text(screen, shop):
+    font = pygame.font.Font(None, 30)
+    text = font.render("Press E to open shop", True, (255, 245, 180))
+    text_rect = text.get_rect(midbottom=(shop.rect.centerx, shop.rect.top - 12))
+    screen.blit(text, text_rect)
+
+
+def draw_level_complete_text(screen):
+    font = pygame.font.Font(None, 44)
+    text = font.render("Level Complete", True, (120, 255, 160))
+    text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, 120))
     screen.blit(text, text_rect)
 
 

@@ -3,6 +3,8 @@ import pygame
 from settings import (
     AUTO_GRAPPLE_ARC_HEIGHT,
     AUTO_GRAPPLE_DURATION,
+    DEBUG_UNLIMITED_HP,
+    DEBUG_UNLIMITED_MANA,
     GRAVITY,
     GUARD_BREAK_TIME,
     NORMAL_PARRY_ACTIVE_TIME,
@@ -26,6 +28,7 @@ from settings import (
     STAMINA_RECOVER_PER_SECOND,
 )
 from src.weapons import get_weapon
+from src.skills import get_skill
 
 
 class Player:
@@ -50,6 +53,14 @@ class Player:
         self.coins = 0
 
         self.current_weapon_id = "light_weapon"
+        self.current_skill_id = "time_freeze"
+        self.skill_cooldown_timer = 0
+        self.debug_unlimited_hp = DEBUG_UNLIMITED_HP
+        self.debug_unlimited_mana = DEBUG_UNLIMITED_MANA
+
+        self.soul_anchor_active = False
+        self.soul_anchor_pos = None
+        self.soul_anchor_timer = 0
 
         self.max_stamina = STAMINA_MAX
         self.current_stamina = STAMINA_MAX
@@ -108,6 +119,17 @@ class Player:
         if keys[pygame.K_5]:
             self.switch_weapon("grapple_weapon")
 
+        if keys[pygame.K_6]:
+            self.switch_skill("time_freeze")
+        if keys[pygame.K_7]:
+            self.switch_skill("orbit_blades")
+        if keys[pygame.K_8]:
+            self.switch_skill("energy_beam")
+        if keys[pygame.K_9]:
+            self.switch_skill("execute_strike")
+        if keys[pygame.K_0]:
+            self.switch_skill("soul_anchor")
+
         self.vel_x = 0
 
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
@@ -147,6 +169,60 @@ class Player:
         self.should_spawn_projectile = False
         self.is_blocking = False
         print(f"Equipped {weapon['name']}")
+
+    def switch_skill(self, skill_id):
+        skill = get_skill(skill_id)
+
+        if self.current_skill_id == skill["id"]:
+            return
+
+        self.current_skill_id = skill["id"]
+        print(f"Equipped skill: {skill['name']}")
+
+    def can_use_skill(self, skill):
+        has_enough_mana = self.debug_unlimited_mana or self.current_mana >= skill["mana_cost"]
+
+        return (
+            has_enough_mana
+            and self.skill_cooldown_timer <= 0
+            and not self.is_dead
+            and not self.is_auto_grappling
+        )
+
+    def spend_skill_cost(self, skill):
+        if not self.debug_unlimited_mana:
+            self.current_mana -= skill["mana_cost"]
+            self.current_mana = max(self.current_mana, 0)
+
+        self.skill_cooldown_timer = skill["cooldown"]
+
+    def toggle_unlimited_hp(self):
+        self.debug_unlimited_hp = not self.debug_unlimited_hp
+
+        if self.debug_unlimited_hp:
+            print("Unlimited HP: ON")
+        else:
+            print("Unlimited HP: OFF")
+
+    def toggle_unlimited_mana(self):
+        self.debug_unlimited_mana = not self.debug_unlimited_mana
+
+        if self.debug_unlimited_mana:
+            print("Unlimited Mana: ON")
+        else:
+            print("Unlimited Mana: OFF")
+
+    def update_skill_timers(self, dt):
+        if self.skill_cooldown_timer > 0:
+            self.skill_cooldown_timer -= dt
+
+        if self.soul_anchor_active:
+            self.soul_anchor_timer -= dt
+
+            if self.soul_anchor_timer <= 0:
+                self.soul_anchor_active = False
+                self.soul_anchor_pos = None
+                self.soul_anchor_timer = 0
 
     def start_dash(self):
         if self.guard_broken_timer > 0:
@@ -226,6 +302,10 @@ class Player:
         if self.invincible_timer > 0 or self.is_dead:
             return
 
+        if self.debug_unlimited_hp:
+            self.invincible_timer = PLAYER_INVINCIBLE_TIME
+            return
+
         self.current_hp -= amount
         self.current_hp = max(self.current_hp, 0)
         self.hp = self.current_hp
@@ -290,6 +370,9 @@ class Player:
     def update(self, dt, platforms, keys):
         self.update_timers(dt)
 
+        if self.debug_unlimited_mana:
+            self.current_mana = self.max_mana
+
         if self.is_dead:
             self.vel_x = 0
             return
@@ -318,6 +401,8 @@ class Player:
         self.move_y(platforms)
 
     def update_timers(self, dt):
+        self.update_skill_timers(dt)
+
         if self.invincible_timer > 0:
             self.invincible_timer -= dt
 
@@ -404,6 +489,10 @@ class Player:
 
         if self.is_auto_grappling and self.auto_grapple_anchor is not None:
             pygame.draw.line(screen, (180, 90, 255), self.auto_grapple_anchor, self.rect.center, 3)
+
+        if self.soul_anchor_active and self.soul_anchor_pos is not None:
+            pygame.draw.circle(screen, (120, 255, 180), self.soul_anchor_pos, 14, 3)
+            pygame.draw.circle(screen, (120, 255, 180), self.soul_anchor_pos, 4)
 
     def draw_block_effect(self, screen):
         if self.facing == 1:

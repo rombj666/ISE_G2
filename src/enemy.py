@@ -18,6 +18,7 @@ class Enemy:
         self.spawn_y = y
         self.max_hp = ENEMY_MAX_HP
         self.current_hp = self.max_hp
+        self.active = True
         self.alive = True
         self.hurt_timer = 0
         self.respawn_timer = 0
@@ -34,24 +35,31 @@ class Enemy:
         self.vel_x = 0
         self.being_pulled = False
         self.pull_target_x = None
+        self.frozen_timer = 0
+        self.is_executable = False
+        self.execute_timer = 0
 
     def take_damage(self, amount):
-        if not self.alive:
+        if not self.active or not self.alive:
             return
 
         self.current_hp -= amount
         self.hurt_timer = 0.12
 
         if self.current_hp <= 0:
-            self.current_hp = 0
-            self.alive = False
-            self.respawn_timer = ENEMY_RESPAWN_TIME
-            self.is_attacking = False
-            self.being_pulled = False
+            self.die()
+
+    def die(self):
+        self.current_hp = 0
+        self.alive = False
+        self.respawn_timer = ENEMY_RESPAWN_TIME
+        self.is_attacking = False
+        self.being_pulled = False
 
     def respawn(self):
         self.rect.x = self.spawn_x
         self.rect.y = self.spawn_y
+        self.active = True
         self.current_hp = self.max_hp
         self.alive = True
         self.dropped_coins = False
@@ -62,6 +70,9 @@ class Enemy:
         self.vel_x = 0
         self.being_pulled = False
         self.pull_target_x = None
+        self.frozen_timer = 0
+        self.is_executable = False
+        self.execute_timer = 0
 
         self.is_attacking = False
         self.attack_timer = 0
@@ -69,9 +80,54 @@ class Enemy:
         self.attack_has_hit = False
         self.attack_hitbox = self.get_attack_hitbox()
 
+    def respawn_at(self, x, y):
+        self.spawn_x = x
+        self.spawn_y = y
+        self.respawn()
+
+    def disable(self):
+        self.active = False
+        self.alive = False
+        self.current_hp = 0
+        self.respawn_timer = 0
+        self.dropped_coins = True
+        self.is_attacking = False
+        self.attack_timer = 0
+        self.attack_cooldown_timer = 0
+        self.attack_has_hit = False
+        self.stunned_timer = 0
+        self.frozen_timer = 0
+        self.is_executable = False
+        self.execute_timer = 0
+        self.being_pulled = False
+        self.pull_target_x = None
+
     def stun(self, duration):
+        if not self.active:
+            return
+
         self.stunned_timer = max(self.stunned_timer, duration)
         self.is_attacking = False
+
+    def freeze(self, duration):
+        if not self.active:
+            return
+
+        self.frozen_timer = max(self.frozen_timer, duration)
+        self.is_attacking = False
+
+    def mark_executable(self, duration):
+        if not self.active:
+            return
+
+        self.is_executable = True
+        self.execute_timer = duration
+
+    def execute(self):
+        if not self.active or not self.alive:
+            return
+
+        self.die()
 
     def start_pull_to_player(self, player):
         self.being_pulled = True
@@ -105,8 +161,17 @@ class Enemy:
         return pygame.Rect(hitbox_x, self.rect.y, ENEMY_ATTACK_RANGE, self.rect.height)
 
     def update(self, dt, player=None):
+        if not self.active:
+            return
+
         if self.hurt_timer > 0:
             self.hurt_timer -= dt
+
+        if self.execute_timer > 0:
+            self.execute_timer -= dt
+
+            if self.execute_timer <= 0:
+                self.is_executable = False
 
         if not self.alive:
             self.respawn_timer -= dt
@@ -121,6 +186,12 @@ class Enemy:
 
         if self.stunned_timer > 0:
             self.stunned_timer -= dt
+
+        if self.frozen_timer > 0:
+            self.frozen_timer -= dt
+            self.is_attacking = False
+            self.attack_has_hit = False
+            return
 
         if self.being_pulled:
             self.update_pull()
@@ -170,10 +241,12 @@ class Enemy:
             self.rect.x -= GRAPPLE_PULL_SPEED
 
     def draw(self, screen):
-        if not self.alive:
+        if not self.active or not self.alive:
             return
 
-        if self.being_pulled:
+        if self.frozen_timer > 0:
+            color = (120, 220, 255)
+        elif self.being_pulled:
             color = (180, 80, 255)
         elif self.stunned_timer > 0:
             color = (255, 220, 80)
@@ -183,6 +256,9 @@ class Enemy:
             color = (220, 50, 50)
 
         pygame.draw.rect(screen, color, self.rect)
+
+        if self.is_executable:
+            pygame.draw.rect(screen, (255, 240, 80), self.rect.inflate(8, 8), 3)
 
         if self.being_pulled:
             pygame.draw.rect(screen, (240, 220, 255), self.rect, 2)
