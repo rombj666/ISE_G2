@@ -5,10 +5,13 @@ import pygame
 from settings import (
     COIN_PICKUP_RANGE,
     COIN_VALUE,
+    DEBUG_MODE,
     ENEMY_DAMAGE,
     FPS,
     FULCRUM_INTERACT_DISTANCE,
     FULCRUM_RADIUS,
+    GAME_OVER_POPUP_HEIGHT,
+    GAME_OVER_POPUP_WIDTH,
     ENERGY_BEAM_DAMAGE,
     ENERGY_BEAM_HEIGHT,
     ENERGY_BEAM_RANGE,
@@ -25,22 +28,23 @@ from settings import (
     TITLE,
     WEAPON_SPECIAL_COOLDOWN,
 )
-from src.coin import Coin
-from src.combat import calculate_damage
-from src.enemy import Enemy
-from src.level_manager import LevelManager
-from src.player import Player
-from src.projectile import Projectile, ReturningShield
-from src.shop import Shop
-from src.skills import (
+from src.core.camera import Camera
+from src.entities.enemy import Enemy
+from src.entities.player import Player
+from src.levels.level_manager import LevelManager
+from src.systems.coin import Coin
+from src.systems.combat import calculate_damage
+from src.systems.projectile import Projectile, ReturningShield
+from src.systems.shop import Shop
+from src.systems.skills import (
     EnergyBeamEffect,
     OrbitBlade,
     SkillCircleEffect,
     TimeFreezeDomain,
     get_skill,
 )
-from src.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
-from src.weapons import get_weapon
+from src.systems.weapons import get_weapon
+from src.ui.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
 
 
 def main():
@@ -53,13 +57,15 @@ def main():
     level_manager = LevelManager()
     player = Player(100, 500)
     enemy = Enemy(0, 0)
-    level_manager.change_room(0, player, enemy)
-    room_0_shop_rect = level_manager.rooms[0].get_shop_rect()
+    current_map = level_manager.get_current_map()
+    camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, current_map.width, current_map.height)
+    level_manager.change_map(0, player, enemy, camera)
+    map_0_shop_rect = level_manager.get_shop_rect()
     shop = Shop(
-        room_0_shop_rect.x,
-        room_0_shop_rect.y,
-        room_0_shop_rect.width,
-        room_0_shop_rect.height,
+        map_0_shop_rect.x,
+        map_0_shop_rect.y,
+        map_0_shop_rect.width,
+        map_0_shop_rect.height,
     )
 
     coins = []
@@ -72,22 +78,72 @@ def main():
     u_was_pressed = False
     grapple_special_hitbox = None
     grapple_special_timer = 0
+    game_state = "playing"
+
+    def clear_world_objects():
+        nonlocal u_was_pressed, grapple_special_hitbox, grapple_special_timer
+        coins.clear()
+        projectiles.clear()
+        returning_shields.clear()
+        time_freeze_domains.clear()
+        active_orbit_blades.clear()
+        active_skill_effects.clear()
+        player.has_active_shield_throw = False
+        grapple_special_hitbox = None
+        grapple_special_timer = 0
+        u_was_pressed = False
+
+    def enter_map(target_map_id):
+        changed = level_manager.change_map(target_map_id, player, enemy, camera)
+        if not changed:
+            return False
+
+        clear_world_objects()
+        shop.close()
+        shop_rect = level_manager.get_shop_rect()
+        if shop_rect is not None:
+            shop.set_rect(shop_rect)
+            shop.refresh_products()
+        return True
+
+    def restart_game():
+        nonlocal game_state
+        player.current_hp = player.max_hp
+        player.hp = player.current_hp
+        player.current_mana = player.max_mana
+        player.mana = player.current_mana
+        player.current_stamina = player.max_stamina
+        player.is_dead = False
+        player.invincible_timer = 0
+        player.vel_x = 0
+        player.vel_y = 0
+        enter_map(0)
+        game_state = "playing"
 
     running = True
     while running:
         dt = clock.tick(FPS) / 1000
         e_pressed = False
         k_pressed = False
-        current_room = level_manager.get_current_room()
-        shop_active = current_room.room_id == 0
+        current_map = level_manager.get_current_map()
+        shop_active = current_map.map_id == 0 and level_manager.get_shop_rect() is not None
 
         if not shop_active and shop.is_open:
             shop.close()
+
+        nearby_door = level_manager.check_doors(player)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                if game_state in ("game_over", "victory"):
+                    if event.key == pygame.K_r:
+                        restart_game()
+                    elif event.key == pygame.K_ESCAPE:
+                        running = False
+                    continue
+
                 if event.key == pygame.K_F1:
                     player.toggle_unlimited_hp()
 
@@ -97,6 +153,12 @@ def main():
                 if event.key == pygame.K_e:
                     if shop_active and shop.can_interact(player):
                         shop.toggle()
+                    elif nearby_door is not None:
+                        target_map = nearby_door["target_map"]
+                        if isinstance(target_map, int):
+                            enter_map(target_map)
+                        elif target_map == "victory":
+                            game_state = "victory"
                     else:
                         e_pressed = True
 
@@ -106,11 +168,12 @@ def main():
                 if shop.is_open:
                     shop.handle_key(event, player)
 
+        current_map = level_manager.get_current_map()
         keys = pygame.key.get_pressed()
-        platforms = level_manager.get_current_platforms()
-        fulcrums = level_manager.get_current_fulcrums()
+        platforms = level_manager.get_platforms()
+        fulcrums = level_manager.get_fulcrums()
 
-        if not shop.is_open:
+        if game_state == "playing" and not shop.is_open:
             if grapple_special_timer > 0:
                 grapple_special_timer -= dt
             else:
@@ -122,33 +185,13 @@ def main():
 
             enemy.update(dt, player)
 
-        if not player.is_dead and not shop.is_open:
+        if game_state == "playing" and not player.is_dead and not shop.is_open:
             player.handle_input(keys)
             player.update(dt, platforms, keys)
-            room_changed = False
-            target_room_id = level_manager.check_room_exit(player)
+            clamp_player_to_map(player, current_map)
+            map_changed = current_map.map_id != level_manager.get_current_map().map_id
 
-            if target_room_id is not None:
-                room_changed = level_manager.change_room(target_room_id, player, enemy)
-
-                if room_changed:
-                    coins.clear()
-                    projectiles.clear()
-                    returning_shields.clear()
-                    time_freeze_domains.clear()
-                    active_orbit_blades.clear()
-                    active_skill_effects.clear()
-                    player.has_active_shield_throw = False
-                    grapple_special_hitbox = None
-                    grapple_special_timer = 0
-                    u_was_pressed = False
-                    platforms = level_manager.get_current_platforms()
-                    fulcrums = level_manager.get_current_fulcrums()
-
-                    if level_manager.get_current_room().room_id != 0:
-                        shop.close()
-
-            if k_pressed and not room_changed:
+            if k_pressed and not map_changed:
                 activate_current_skill(
                     player,
                     enemy,
@@ -159,14 +202,14 @@ def main():
 
             nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
 
-            if e_pressed and nearby_fulcrum is not None and not room_changed:
+            if e_pressed and nearby_fulcrum is not None and not map_changed:
                 player.start_auto_grapple(nearby_fulcrum["anchor"], nearby_fulcrum["target"])
 
-            if player.should_spawn_projectile and not room_changed:
+            if player.should_spawn_projectile and not map_changed:
                 spawn_projectile(player, projectiles)
                 player.should_spawn_projectile = False
 
-            if not room_changed:
+            if not map_changed:
                 handle_player_attack(player, enemy)
                 new_special_hitbox = handle_weapon_special(
                     keys,
@@ -182,7 +225,7 @@ def main():
                 grapple_special_hitbox = new_special_hitbox
                 grapple_special_timer = 0.12
 
-            if not room_changed:
+            if not map_changed:
                 u_was_pressed = keys[pygame.K_u]
 
             update_projectiles(projectiles, dt, platforms, enemy)
@@ -197,78 +240,85 @@ def main():
             coins = [coin for coin in coins if not coin.collected]
             projectiles = [projectile for projectile in projectiles if projectile.alive]
 
-        if not shop.is_open:
+        if player.is_dead and game_state == "playing":
+            game_state = "game_over"
+
+        camera.update(player.rect)
+
+        if game_state == "playing" and not shop.is_open:
             for effect in active_skill_effects:
                 effect.update(dt)
             active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
 
         screen.fill((18, 20, 30))
 
-        level_manager.draw_current_room(screen)
+        level_manager.draw_current_map(screen, camera)
 
-        current_room = level_manager.get_current_room()
-        shop_active = current_room.room_id == 0
+        current_map = level_manager.get_current_map()
+        shop_active = current_map.map_id == 0 and level_manager.get_shop_rect() is not None
 
         if shop_active:
-            shop.draw_shop_area(screen)
+            shop.draw_shop_area(screen, camera)
 
         for fulcrum in fulcrums:
-            pygame.draw.circle(screen, (150, 80, 230), fulcrum["anchor"], FULCRUM_RADIUS)
-            pygame.draw.rect(screen, (150, 80, 230), fulcrum["rect"], 1)
+            pygame.draw.circle(screen, (150, 80, 230), camera.apply_pos(fulcrum["anchor"]), FULCRUM_RADIUS)
+            pygame.draw.rect(screen, (150, 80, 230), camera.apply_rect(fulcrum["rect"]), 1)
 
         for coin in coins:
-            coin.draw(screen)
+            coin.draw(screen, camera)
 
         for projectile in projectiles:
-            projectile.draw(screen)
+            projectile.draw(screen, camera)
 
         for shield in returning_shields:
-            shield.draw(screen)
+            shield.draw(screen, camera)
 
         for domain in time_freeze_domains:
-            domain.draw(screen)
+            domain.draw(screen, camera)
 
         for blade in active_orbit_blades:
-            blade.draw(screen)
+            blade.draw(screen, camera)
 
         for effect in active_skill_effects:
-            effect.draw(screen)
+            effect.draw(screen, camera)
 
-        enemy.draw(screen)
-        player.draw(screen)
+        enemy.draw(screen, camera)
+        player.draw(screen, camera)
 
         weapon = get_weapon(player.current_weapon_id)
         if player.is_attacking and weapon["weapon_type"] != "projectile":
-            pygame.draw.rect(screen, (70, 140, 255), player.get_attack_hitbox(), 2)
+            pygame.draw.rect(screen, (70, 140, 255), camera.apply_rect(player.get_attack_hitbox()), 2)
 
         if enemy.is_attacking and enemy.alive:
-            pygame.draw.rect(screen, (255, 150, 50), enemy.get_attack_hitbox(), 2)
+            pygame.draw.rect(screen, (255, 150, 50), camera.apply_rect(enemy.get_attack_hitbox()), 2)
 
         if grapple_special_hitbox is not None:
-            pygame.draw.rect(screen, (180, 80, 255), grapple_special_hitbox, 2)
+            pygame.draw.rect(screen, (180, 80, 255), camera.apply_rect(grapple_special_hitbox), 2)
 
         nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
         if nearby_fulcrum is not None and not player.is_auto_grappling:
-            draw_interaction_text(screen, player)
+            draw_interaction_text(screen, player, camera)
 
         if shop_active and shop.can_interact(player) and not shop.is_open:
-            draw_shop_interaction_text(screen, shop)
+            draw_shop_interaction_text(screen, shop, camera)
 
-        draw_player_ui(screen, player, level_manager.get_current_room().name)
-        draw_weapon_boxes(screen, player)
-        draw_skill_boxes(screen, player)
+        nearby_door = level_manager.check_doors(player)
+        if nearby_door is not None:
+            draw_door_interaction_text(screen, nearby_door, camera)
 
-        if level_manager.get_current_room().room_id == 3:
-            draw_level_complete_text(screen)
+        draw_player_ui(screen, player, level_manager.get_current_map().name)
+
+        if DEBUG_MODE:
+            draw_weapon_boxes(screen, player)
+            draw_skill_boxes(screen, player)
 
         if shop.is_open:
             shop.draw_shop_menu(screen, player)
 
-        if player.is_dead:
-            font = pygame.font.Font(None, 72)
-            game_over_text = font.render("GAME OVER", True, (255, 80, 80))
-            text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            screen.blit(game_over_text, text_rect)
+        if game_state == "game_over":
+            draw_popup(screen, "GAME OVER", "You were defeated.")
+        elif game_state == "victory":
+            draw_popup(screen, "PROTOTYPE COMPLETE", "You reached the final door.")
 
         pygame.display.flip()
 
@@ -581,6 +631,19 @@ def update_coins(coins, dt, platforms, player):
             player.collect_coin(coin)
 
 
+def clamp_player_to_map(player, game_map):
+    if player.rect.left < 0:
+        player.rect.left = 0
+
+    if player.rect.right > game_map.width:
+        player.rect.right = game_map.width
+
+    if player.rect.bottom > game_map.height:
+        player.rect.bottom = game_map.height
+        player.vel_y = 0
+        player.on_ground = True
+
+
 def get_nearby_fulcrum(player, fulcrums):
     if get_weapon(player.current_weapon_id)["id"] != "grapple_weapon":
         return None
@@ -600,17 +663,34 @@ def get_nearby_fulcrum(player, fulcrums):
     return None
 
 
-def draw_interaction_text(screen, player):
+def draw_interaction_text(screen, player, camera=None):
     font = pygame.font.Font(None, 30)
     text = font.render("Press E to grapple", True, (235, 225, 255))
-    text_rect = text.get_rect(midbottom=(player.rect.centerx, player.rect.top - 12))
+    pos = (player.rect.centerx, player.rect.top - 12)
+    if camera:
+        pos = camera.apply_pos(pos)
+    text_rect = text.get_rect(midbottom=pos)
     screen.blit(text, text_rect)
 
 
-def draw_shop_interaction_text(screen, shop):
+def draw_shop_interaction_text(screen, shop, camera=None):
     font = pygame.font.Font(None, 30)
     text = font.render("Press E to open shop", True, (255, 245, 180))
-    text_rect = text.get_rect(midbottom=(shop.rect.centerx, shop.rect.top - 12))
+    pos = (shop.rect.centerx, shop.rect.top - 12)
+    if camera:
+        pos = camera.apply_pos(pos)
+    text_rect = text.get_rect(midbottom=pos)
+    screen.blit(text, text_rect)
+
+
+def draw_door_interaction_text(screen, door, camera=None):
+    font = pygame.font.Font(None, 30)
+    text = font.render("Press E to enter", True, (220, 255, 220))
+    rect = door["rect"]
+    pos = (rect.centerx, rect.top - 12)
+    if camera:
+        pos = camera.apply_pos(pos)
+    text_rect = text.get_rect(midbottom=pos)
     screen.blit(text, text_rect)
 
 
@@ -619,6 +699,30 @@ def draw_level_complete_text(screen):
     text = font.render("Level Complete", True, (120, 255, 160))
     text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, 120))
     screen.blit(text, text_rect)
+
+
+def draw_popup(screen, title, message):
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 150))
+    screen.blit(overlay, (0, 0))
+
+    panel = pygame.Rect(0, 0, GAME_OVER_POPUP_WIDTH, GAME_OVER_POPUP_HEIGHT)
+    panel.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    pygame.draw.rect(screen, (24, 24, 34), panel)
+    pygame.draw.rect(screen, (235, 220, 140), panel, 3)
+
+    title_font = pygame.font.Font(None, 56)
+    text_font = pygame.font.Font(None, 30)
+
+    title_text = title_font.render(title, True, (255, 245, 180))
+    message_text = text_font.render(message, True, (235, 235, 235))
+    restart_text = text_font.render("Press R to Restart", True, (235, 235, 235))
+    quit_text = text_font.render("Press ESC to Quit", True, (235, 235, 235))
+
+    screen.blit(title_text, title_text.get_rect(center=(panel.centerx, panel.y + 58)))
+    screen.blit(message_text, message_text.get_rect(center=(panel.centerx, panel.y + 112)))
+    screen.blit(restart_text, restart_text.get_rect(center=(panel.centerx, panel.y + 170)))
+    screen.blit(quit_text, quit_text.get_rect(center=(panel.centerx, panel.y + 208)))
 
 
 if __name__ == "__main__":

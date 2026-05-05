@@ -98,9 +98,13 @@ class TimeFreezeDomain:
             if distance <= self.radius:
                 enemy.freeze(0.1)
 
-    def draw(self, screen):
-        pygame.draw.circle(screen, (80, 180, 255), self.center, self.radius, 3)
-        pygame.draw.circle(screen, (30, 90, 150), self.center, self.radius // 3, 1)
+    def draw(self, screen, camera=None):
+        center = self.center
+        if camera:
+            center = camera.apply_pos(center)
+
+        pygame.draw.circle(screen, (80, 180, 255), center, self.radius, 3)
+        pygame.draw.circle(screen, (30, 90, 150), center, self.radius // 3, 1)
 
 
 class OrbitBlade:
@@ -182,7 +186,7 @@ class OrbitBlade:
             self.state = "dead"
             print("Orbit blade hit enemy")
 
-    def draw(self, screen):
+    def draw(self, screen, camera=None):
         if not self.alive:
             return
 
@@ -191,8 +195,12 @@ class OrbitBlade:
         else:
             color = (255, 240, 90)
 
-        pygame.draw.ellipse(screen, color, self.rect)
-        pygame.draw.ellipse(screen, (230, 255, 255), self.rect, 1)
+        draw_rect = self.rect
+        if camera:
+            draw_rect = camera.apply_rect(self.rect)
+
+        pygame.draw.ellipse(screen, color, draw_rect)
+        pygame.draw.ellipse(screen, (230, 255, 255), draw_rect, 1)
 
 
 class EnergyBeamEffect:
@@ -206,9 +214,13 @@ class EnergyBeamEffect:
         if self.timer <= 0:
             self.alive = False
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, (80, 230, 255), self.rect)
-        pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
+    def draw(self, screen, camera=None):
+        draw_rect = self.rect
+        if camera:
+            draw_rect = camera.apply_rect(self.rect)
+
+        pygame.draw.rect(screen, (80, 230, 255), draw_rect)
+        pygame.draw.rect(screen, (255, 255, 255), draw_rect, 2)
 
 
 class SkillCircleEffect:
@@ -224,5 +236,9 @@ class SkillCircleEffect:
         if self.timer <= 0:
             self.alive = False
 
-    def draw(self, screen):
-        pygame.draw.circle(screen, self.color, self.center, self.radius, 3)
+    def draw(self, screen, camera=None):
+        center = self.center
+        if camera:
+            center = camera.apply_pos(center)
+
+        pygame.draw.circle(screen, self.color, center, self.radius, 3)

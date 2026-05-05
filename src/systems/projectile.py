@@ -54,11 +54,15 @@ class Projectile:
             if self.rect.colliderect(platform):
                 self.alive = False
 
-    def draw(self, screen):
+    def draw(self, screen, camera=None):
         if not self.alive:
             return
 
-        pygame.draw.rect(screen, (255, 190, 60), self.rect)
+        draw_rect = self.rect
+        if camera:
+            draw_rect = camera.apply_rect(self.rect)
+
+        pygame.draw.rect(screen, (255, 190, 60), draw_rect)
 
 
 class ReturningShield:
@@ -146,7 +150,7 @@ class ReturningShield:
             self.hit_cooldown_timer = SHIELD_THROW_HIT_COOLDOWN
             print(f"Shield returning hit enemy for {self.damage} damage")
 
-    def draw(self, screen):
+    def draw(self, screen, camera=None):
         if not self.alive:
             return
 
@@ -155,5 +159,9 @@ class ReturningShield:
         else:
             color = (80, 160, 255)
 
-        pygame.draw.ellipse(screen, color, self.rect)
-        pygame.draw.ellipse(screen, (220, 250, 255), self.rect, 2)
+        draw_rect = self.rect
+        if camera:
+            draw_rect = camera.apply_rect(self.rect)
+
+        pygame.draw.ellipse(screen, color, draw_rect)
+        pygame.draw.ellipse(screen, (220, 250, 255), draw_rect, 2)

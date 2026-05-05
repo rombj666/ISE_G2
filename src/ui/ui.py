@@ -12,8 +12,8 @@ from settings import (
     WEAPON_BOX_HEIGHT,
     WEAPON_BOX_WIDTH,
 )
-from src.skills import get_skill
-from src.weapons import get_all_weapons, get_weapon
+from src.systems.skills import get_skill
+from src.systems.weapons import get_all_weapons, get_weapon
 
 
 def draw_player_ui(screen, player, room_name=None):

@@ -22,8 +22,12 @@ class Coin:
                 self.rect.bottom = platform.top
                 self.vel_y = 0
 
-    def draw(self, screen):
+    def draw(self, screen, camera=None):
         if self.collected:
             return
 
-        pygame.draw.circle(screen, (255, 220, 60), self.rect.center, COIN_RADIUS)
+        center = self.rect.center
+        if camera:
+            center = camera.apply_pos(center)
+
+        pygame.draw.circle(screen, (255, 220, 60), center, COIN_RADIUS)

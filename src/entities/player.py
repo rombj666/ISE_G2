@@ -27,8 +27,8 @@ from settings import (
     STAMINA_RECOVER_DELAY_AFTER_HIT,
     STAMINA_RECOVER_PER_SECOND,
 )
-from src.weapons import get_weapon
-from src.skills import get_skill
+from src.systems.skills import get_skill
+from src.systems.weapons import get_weapon
 
 
 class Player:
@@ -471,7 +471,7 @@ class Player:
                     self.rect.top = platform.bottom
                     self.vel_y = 0
 
-    def draw(self, screen):
+    def draw(self, screen, camera=None):
         if self.guard_broken_timer > 0:
             color = (255, 180, 80)
         elif self.invincible_timer > 0:
@@ -479,33 +479,51 @@ class Player:
         else:
             color = (180, 220, 255)
 
-        pygame.draw.rect(screen, color, self.rect)
+        draw_rect = self.rect
+        if camera:
+            draw_rect = camera.apply_rect(self.rect)
+
+        pygame.draw.rect(screen, color, draw_rect)
 
         if self.is_blocking:
-            self.draw_block_effect(screen)
+            self.draw_block_effect(screen, camera)
 
         if self.is_parrying:
-            self.draw_parry_effect(screen)
+            self.draw_parry_effect(screen, camera)
 
         if self.is_auto_grappling and self.auto_grapple_anchor is not None:
-            pygame.draw.line(screen, (180, 90, 255), self.auto_grapple_anchor, self.rect.center, 3)
+            start_pos = self.auto_grapple_anchor
+            end_pos = self.rect.center
+            if camera:
+                start_pos = camera.apply_pos(start_pos)
+                end_pos = camera.apply_pos(end_pos)
+            pygame.draw.line(screen, (180, 90, 255), start_pos, end_pos, 3)
 
         if self.soul_anchor_active and self.soul_anchor_pos is not None:
-            pygame.draw.circle(screen, (120, 255, 180), self.soul_anchor_pos, 14, 3)
-            pygame.draw.circle(screen, (120, 255, 180), self.soul_anchor_pos, 4)
+            anchor_pos = self.soul_anchor_pos
+            if camera:
+                anchor_pos = camera.apply_pos(anchor_pos)
+            pygame.draw.circle(screen, (120, 255, 180), anchor_pos, 14, 3)
+            pygame.draw.circle(screen, (120, 255, 180), anchor_pos, 4)
 
-    def draw_block_effect(self, screen):
+    def draw_block_effect(self, screen, camera=None):
         if self.facing == 1:
             shield_rect = pygame.Rect(self.rect.right, self.rect.y + 8, 10, self.rect.height - 16)
         else:
             shield_rect = pygame.Rect(self.rect.left - 10, self.rect.y + 8, 10, self.rect.height - 16)
 
+        if camera:
+            shield_rect = camera.apply_rect(shield_rect)
+
         pygame.draw.rect(screen, (80, 170, 255), shield_rect, 2)
 
-    def draw_parry_effect(self, screen):
+    def draw_parry_effect(self, screen, camera=None):
         if self.facing == 1:
             parry_rect = pygame.Rect(self.rect.right, self.rect.y, 20, self.rect.height)
         else:
             parry_rect = pygame.Rect(self.rect.left - 20, self.rect.y, 20, self.rect.height)
+
+        if camera:
+            parry_rect = camera.apply_rect(parry_rect)
 
         pygame.draw.rect(screen, (255, 255, 120), parry_rect, 2)

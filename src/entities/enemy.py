@@ -240,7 +240,7 @@ class Enemy:
         else:
             self.rect.x -= GRAPPLE_PULL_SPEED
 
-    def draw(self, screen):
+    def draw(self, screen, camera=None):
         if not self.active or not self.alive:
             return
 
@@ -255,17 +255,21 @@ class Enemy:
         else:
             color = (220, 50, 50)
 
-        pygame.draw.rect(screen, color, self.rect)
+        draw_rect = self.rect
+        if camera:
+            draw_rect = camera.apply_rect(self.rect)
+
+        pygame.draw.rect(screen, color, draw_rect)
 
         if self.is_executable:
-            pygame.draw.rect(screen, (255, 240, 80), self.rect.inflate(8, 8), 3)
+            pygame.draw.rect(screen, (255, 240, 80), draw_rect.inflate(8, 8), 3)
 
         if self.being_pulled:
-            pygame.draw.rect(screen, (240, 220, 255), self.rect, 2)
+            pygame.draw.rect(screen, (240, 220, 255), draw_rect, 2)
 
-        self.draw_hp_bar(screen)
+        self.draw_hp_bar(screen, camera)
 
-    def draw_hp_bar(self, screen):
+    def draw_hp_bar(self, screen, camera=None):
         bar_width = self.rect.width
         bar_height = 6
         bar_x = self.rect.x
@@ -276,6 +280,10 @@ class Enemy:
 
         background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
         fill_rect = pygame.Rect(bar_x, bar_y, fill_width, bar_height)
+
+        if camera:
+            background_rect = camera.apply_rect(background_rect)
+            fill_rect = camera.apply_rect(fill_rect)
 
         pygame.draw.rect(screen, (60, 20, 20), background_rect)
         pygame.draw.rect(screen, (50, 220, 80), fill_rect)
