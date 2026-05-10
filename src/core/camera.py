@@ -37,8 +37,11 @@ class Camera:
             round(rect.x - self.x),
             round(rect.y - self.y),
             rect.width,
-            rect.height,
+            rect.height
         )
 
     def apply_pos(self, pos):
-        return (round(pos[0] - self.x), round(pos[1] - self.y))
+        return (
+            round(pos[0] - self.x),
+            round(pos[1] - self.y)
+        )

@@ -27,6 +27,9 @@ from settings import (
     TIME_FREEZE_DURATION,
     TITLE,
     WEAPON_SPECIAL_COOLDOWN,
+    PIXELATE_GAME, 
+    PIXEL_WIDTH, 
+    PIXEL_HEIGHT
 )
 from src.core.camera import Camera
 from src.entities.enemy import Enemy
@@ -50,7 +53,8 @@ from src.ui.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
 def main():
     pygame.init()
 
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    window = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)).convert()
     pygame.display.set_caption(TITLE)
     clock = pygame.time.Clock()
 
@@ -60,12 +64,16 @@ def main():
     current_map = level_manager.get_current_map()
     camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, current_map.width, current_map.height)
     level_manager.change_map(0, player, enemy, camera)
-    map_0_shop_rect = level_manager.get_shop_rect()
+    initial_shop_rect = level_manager.get_shop_rect()
+
+    if initial_shop_rect is None:
+        initial_shop_rect = pygame.Rect(0, 0, 1, 1)
+
     shop = Shop(
-        map_0_shop_rect.x,
-        map_0_shop_rect.y,
-        map_0_shop_rect.width,
-        map_0_shop_rect.height,
+        initial_shop_rect.x,
+        initial_shop_rect.y,
+        initial_shop_rect.width,
+        initial_shop_rect.height,
     )
 
     coins = []
@@ -126,7 +134,7 @@ def main():
         e_pressed = False
         k_pressed = False
         current_map = level_manager.get_current_map()
-        shop_active = current_map.map_id == 0 and level_manager.get_shop_rect() is not None
+        shop_active = level_manager.get_shop_rect() is not None
 
         if not shop_active and shop.is_open:
             shop.close()
@@ -250,7 +258,7 @@ def main():
                 effect.update(dt)
             active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
 
-        screen.fill((18, 20, 30))
+        #screen.fill((18, 20, 30))# Background is drawn inside level_manager.draw_current_map()
 
         level_manager.draw_current_map(screen, camera)
 
@@ -319,6 +327,13 @@ def main():
             draw_popup(screen, "GAME OVER", "You were defeated.")
         elif game_state == "victory":
             draw_popup(screen, "PROTOTYPE COMPLETE", "You reached the final door.")
+
+        if PIXELATE_GAME:
+            small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
+            pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            window.blit(pixel_surface, (0, 0))
+        else:
+            window.blit(screen, (0, 0))
 
         pygame.display.flip()
 

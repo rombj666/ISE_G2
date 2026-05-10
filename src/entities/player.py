@@ -483,7 +483,7 @@ class Player:
         if camera:
             draw_rect = camera.apply_rect(self.rect)
 
-        pygame.draw.rect(screen, color, draw_rect)
+        self.draw_kael_template(screen, draw_rect, color)
 
         if self.is_blocking:
             self.draw_block_effect(screen, camera)
@@ -505,6 +505,101 @@ class Player:
                 anchor_pos = camera.apply_pos(anchor_pos)
             pygame.draw.circle(screen, (120, 255, 180), anchor_pos, 14, 3)
             pygame.draw.circle(screen, (120, 255, 180), anchor_pos, 4)
+
+    def draw_kael_template(self, screen, draw_rect, state_color):
+        """
+        Draws Kael as a simple pixel-style character template.
+        This is only visual. It does not affect collision or gameplay.
+        """
+
+        x = draw_rect.x
+        y = draw_rect.y
+        w = draw_rect.width
+        h = draw_rect.height
+
+        # Main palette
+        armor_dark = (30, 34, 48)
+        armor_mid = (58, 64, 86)
+        armor_light = (105, 116, 145)
+        moon_core = (150, 220, 255)
+        moon_glow = (90, 170, 230)
+        shadow = (12, 14, 22)
+
+        # Special state colors
+        if self.guard_broken_timer > 0:
+            moon_core = (255, 180, 80)
+            moon_glow = (255, 120, 50)
+        elif self.invincible_timer > 0:
+            moon_core = (255, 255, 255)
+            moon_glow = (220, 240, 255)
+        elif self.is_dashing:
+            moon_core = (170, 240, 255)
+            moon_glow = (80, 210, 255)
+
+        # Small dash afterimage / glow
+        if self.is_dashing:
+            glow_rect = pygame.Rect(x - self.facing * 10, y + 12, w, h - 12)
+            pygame.draw.rect(screen, (60, 120, 180), glow_rect, 1)
+
+        # Crown reactor glow above head
+        crown_x = x + w // 2
+        pygame.draw.rect(screen, moon_glow, (crown_x - 7, y - 8, 14, 3))
+        pygame.draw.rect(screen, moon_core, (crown_x - 3, y - 13, 6, 6))
+
+        # Head
+        head_rect = pygame.Rect(x + 13, y + 4, 22, 18)
+        pygame.draw.rect(screen, armor_mid, head_rect)
+        pygame.draw.rect(screen, armor_light, (head_rect.x + 3, head_rect.y + 3, 16, 3))
+
+        # Face shadow / visor
+        visor_rect = pygame.Rect(head_rect.x + 4, head_rect.y + 9, 14, 4)
+        pygame.draw.rect(screen, shadow, visor_rect)
+
+        # Body armor
+        body_rect = pygame.Rect(x + 10, y + 24, 28, 25)
+        pygame.draw.rect(screen, armor_dark, body_rect)
+        pygame.draw.rect(screen, armor_mid, (body_rect.x + 3, body_rect.y + 3, 22, 18))
+
+        # Chest moon core
+        core_rect = pygame.Rect(x + 20, y + 31, 8, 8)
+        pygame.draw.rect(screen, moon_glow, (core_rect.x - 2, core_rect.y - 2, 12, 12), 1)
+        pygame.draw.rect(screen, moon_core, core_rect)
+
+        # Shoulders
+        pygame.draw.rect(screen, armor_light, (x + 5, y + 25, 8, 10))
+        pygame.draw.rect(screen, armor_light, (x + 35, y + 25, 8, 10))
+
+        # Arms
+        if self.facing == 1:
+            front_arm = pygame.Rect(x + 37, y + 35, 7, 18)
+            back_arm = pygame.Rect(x + 4, y + 35, 6, 15)
+        else:
+            front_arm = pygame.Rect(x + 4, y + 35, 7, 18)
+            back_arm = pygame.Rect(x + 38, y + 35, 6, 15)
+
+        pygame.draw.rect(screen, armor_mid, back_arm)
+        pygame.draw.rect(screen, armor_light, front_arm)
+
+        # Legs
+        left_leg = pygame.Rect(x + 12, y + 49, 9, 15)
+        right_leg = pygame.Rect(x + 27, y + 49, 9, 15)
+        pygame.draw.rect(screen, armor_dark, left_leg)
+        pygame.draw.rect(screen, armor_dark, right_leg)
+        pygame.draw.rect(screen, armor_light, (left_leg.x, left_leg.bottom - 4, 10, 4))
+        pygame.draw.rect(screen, armor_light, (right_leg.x, right_leg.bottom - 4, 10, 4))
+
+        # Weapon hint / small blade glow when attacking
+        if self.is_attacking:
+            if self.facing == 1:
+                blade_rect = pygame.Rect(x + w - 2, y + 28, 28, 5)
+            else:
+                blade_rect = pygame.Rect(x - 26, y + 28, 28, 5)
+
+            pygame.draw.rect(screen, moon_core, blade_rect)
+            pygame.draw.rect(screen, moon_glow, blade_rect, 2)
+
+        # Thin outline
+        pygame.draw.rect(screen, shadow, draw_rect, 1)
 
     def draw_block_effect(self, screen, camera=None):
         if self.facing == 1:
