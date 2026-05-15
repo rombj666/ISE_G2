@@ -1,3 +1,5 @@
+import math
+
 import pygame
 
 from settings import (
@@ -125,6 +127,20 @@ def draw_moon_platform(screen, rect):
     if rect.height >= 150 and rect.width <= 80:
         draw_pillar_platform(screen, rect)
         return
+    
+    # Thin cap — draw as a slim ledge strip, no forced minimum height
+    if rect.height <= 12:
+        top_color  = (182, 186, 204)
+        face_color = (90, 94, 112)
+        dark_color = (50, 54, 70)
+        glow_color = (85, 200, 250)
+        pygame.draw.rect(screen, face_color, rect)
+        pygame.draw.rect(screen, top_color,  (rect.x, rect.y, rect.width, 3))
+        pygame.draw.rect(screen, (235, 238, 246), (rect.x, rect.y, rect.width, 1))
+        for x in range(rect.x + 50, rect.right - 20, 140):
+            pygame.draw.rect(screen, glow_color, (x, rect.y + 4, 14, 2))
+        return
+
     # Anything whose bottom touches the ground line draws as solid stone (rubble / step / building)
     if rect.bottom >= SCREEN_HEIGHT - 70:
         draw_ground_platform(screen, rect)
@@ -751,6 +767,263 @@ def draw_level1_wall_masses(screen, camera, game_map=None):
                 if hole_h > 10:
                     pygame.draw.rect(screen, window, apply_rect(pygame.Rect(x, block.y + 24, 36, hole_h)))
 
+def draw_section4_tram_wreck(screen, camera):
+    """
+    Section 4 (x=3900-5100): A real crashed-tram scene.
+    - Train rails along the ground
+    - Hanging power-line poles + sagging cables (one broken, sparking)
+    - 3 tram cars + a cab debris piece, each with body/windows/doors/wheels
+    - Tram car 3 is overturned on its side with smoke billowing out
+    - Scattered glass + twisted metal on the ground
+    """
+    def apply_rect(rect):
+        if camera is not None:
+            return camera.apply_rect(rect)
+        return rect
+
+    def apply_pos(pos):
+        if camera is not None:
+            return camera.apply_pos(pos)
+        return pos
+
+    # ─── Colors ────────────────────────────────────────────────────────
+    body_main   = (62, 75, 98)
+    body_dark   = (32, 42, 60)
+    body_light  = (90, 108, 130)
+    glass       = (30, 50, 80)
+    glass_glow  = (95, 135, 175)
+    metal       = (95, 100, 110)
+    metal_dark  = (45, 50, 60)
+    rust        = (130, 65, 35)
+    rust_dark   = (80, 35, 15)
+    wheel       = (28, 30, 38)
+    wheel_hub   = (75, 80, 90)
+    rail        = (115, 115, 125)
+    rail_dark   = (60, 60, 70)
+    tie         = (60, 45, 30)
+    spark       = (255, 220, 100)
+    spark_hot   = (255, 255, 220)
+    cable       = (32, 32, 42)
+    pole        = (62, 68, 78)
+    pole_dark   = (35, 38, 48)
+    smoke       = (75, 75, 82)
+    smoke_light = (110, 110, 118)
+    ember       = (255, 130, 60)
+
+    # ─── Train tracks along the street ─────────────────────────────────
+    # Crossties (sleepers) every 24px
+    for tx in range(3900, 5100, 24):
+        pygame.draw.rect(screen, tie, apply_rect(pygame.Rect(tx, 656, 18, 5)))
+    # Two parallel rails (front + back)
+    pygame.draw.rect(screen, rail, apply_rect(pygame.Rect(3900, 653, 1200, 3)))
+    pygame.draw.rect(screen, rail_dark, apply_rect(pygame.Rect(3900, 656, 1200, 1)))
+    pygame.draw.rect(screen, rail, apply_rect(pygame.Rect(3900, 664, 1200, 3)))
+    pygame.draw.rect(screen, rail_dark, apply_rect(pygame.Rect(3900, 667, 1200, 1)))
+    # Bent rail near the crash — kinked upward
+    pygame.draw.line(screen, rail, apply_pos((4670, 654)), apply_pos((4720, 638)), 3)
+    pygame.draw.line(screen, rail, apply_pos((4720, 638)), apply_pos((4760, 654)), 3)
+    pygame.draw.line(screen, rail, apply_pos((4670, 665)), apply_pos((4720, 648)), 3)
+    pygame.draw.line(screen, rail, apply_pos((4720, 648)), apply_pos((4760, 665)), 3)
+
+    # ─── Power-line poles ──────────────────────────────────────────────
+    for px in [3950, 4400, 4850]:
+        pygame.draw.rect(screen, pole, apply_rect(pygame.Rect(px, 350, 6, 200)))
+        pygame.draw.rect(screen, pole_dark, apply_rect(pygame.Rect(px, 350, 6, 200)), 1)
+        # Crossbar
+        pygame.draw.rect(screen, pole, apply_rect(pygame.Rect(px - 18, 350, 42, 6)))
+        pygame.draw.rect(screen, pole_dark, apply_rect(pygame.Rect(px - 18, 350, 42, 6)), 1)
+        # Insulators (small)
+        pygame.draw.rect(screen, (180, 170, 150), apply_rect(pygame.Rect(px - 14, 346, 4, 6)))
+        pygame.draw.rect(screen, (180, 170, 150), apply_rect(pygame.Rect(px + 16, 346, 4, 6)))
+
+    # ─── Sagging cables between poles ──────────────────────────────────
+    # Between pole 1 and pole 2 — slight sag
+    pygame.draw.line(screen, cable, apply_pos((3956, 354)), apply_pos((4180, 405)), 2)
+    pygame.draw.line(screen, cable, apply_pos((4180, 405)), apply_pos((4400, 354)), 2)
+    # Between pole 2 and pole 3 — broken, drooping down toward overturned car, sparking
+    pygame.draw.line(screen, cable, apply_pos((4406, 354)), apply_pos((4620, 420)), 2)
+    pygame.draw.line(screen, cable, apply_pos((4620, 420)), apply_pos((4770, 470)), 2)
+    # Sparks at the broken end
+    pygame.draw.circle(screen, spark, apply_pos((4770, 470)), 3)
+    pygame.draw.circle(screen, spark_hot, apply_pos((4770, 470)), 1)
+    for sx, sy in [(4762, 478), (4780, 463), (4774, 482), (4768, 462)]:
+        pygame.draw.rect(screen, spark, apply_rect(pygame.Rect(sx, sy, 2, 2)))
+    # Continuing cable past the broken section
+    pygame.draw.line(screen, cable, apply_pos((4856, 354)), apply_pos((5080, 405)), 2)
+
+    # ─── Tram Car 1: Mostly intact, on wheels (4030, 520, 360, 130) ────
+    c1x, c1y, c1w, c1h = 4030, 520, 360, 130
+    # Main body
+    pygame.draw.rect(screen, body_main, apply_rect(pygame.Rect(c1x, c1y + 10, c1w, c1h - 10)))
+    # Roof (slightly indented = lighter)
+    pygame.draw.rect(screen, body_light, apply_rect(pygame.Rect(c1x + 8, c1y, c1w - 16, 14)))
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c1x + 8, c1y, c1w - 16, 14)), 1)
+    # Belt line stripe
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c1x + 4, c1y + 56, c1w - 8, 3)))
+    # Bottom shadow strip
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c1x, c1y + c1h - 14, c1w, 6)))
+    # Windows — 4 across the upper body
+    for wi in range(4):
+        wx = c1x + 22 + wi * 78
+        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(wx, c1y + 22, 56, 28)))
+        pygame.draw.rect(screen, glass_glow, apply_rect(pygame.Rect(wx + 4, c1y + 26, 14, 4)))
+        pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(wx, c1y + 22, 56, 28)), 1)
+    # Door on the right
+    dx, dy = c1x + c1w - 50, c1y + 68
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(dx, dy, 36, 58)))
+    pygame.draw.rect(screen, body_light, apply_rect(pygame.Rect(dx, dy, 36, 58)), 2)
+    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(dx + 28, dy + 26, 4, 8)))   # handle
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(dx + 16, dy, 2, 58)))   # door split line
+    # Tram route number plate
+    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(c1x + 14, c1y + 18, 20, 12)))
+    pygame.draw.rect(screen, spark, apply_rect(pygame.Rect(c1x + 17, c1y + 21, 14, 6)))
+    # Rust patches
+    pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(c1x + 90, c1y + 80, 22, 18)))
+    pygame.draw.rect(screen, rust_dark, apply_rect(pygame.Rect(c1x + 92, c1y + 82, 14, 6)))
+    pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(c1x + 240, c1y + 96, 18, 14)))
+    pygame.draw.rect(screen, rust_dark, apply_rect(pygame.Rect(c1x + 244, c1y + 100, 10, 4)))
+    # Wheels — 4 along the bottom
+    for wx_off in [45, 115, 245, 315]:
+        wx = c1x + wx_off
+        pygame.draw.circle(screen, wheel, apply_pos((wx, c1y + c1h + 4)), 13)
+        pygame.draw.circle(screen, wheel_hub, apply_pos((wx, c1y + c1h + 4)), 6)
+        pygame.draw.circle(screen, metal_dark, apply_pos((wx, c1y + c1h + 4)), 13, 2)
+        # Spokes
+        for sa in range(0, 4):
+            ang = sa * 0.78
+            sx = int(wx + math.cos(ang) * 8)
+            sy = int(c1y + c1h + 4 + math.sin(ang) * 8)
+            pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(sx - 1, sy - 1, 2, 2)))
+    # Coupler at the right end (connects to next car)
+    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(c1x + c1w, c1y + c1h - 28, 30, 10)))
+    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(c1x + c1w + 4, c1y + c1h - 26, 22, 6)))
+
+    # ─── Tram Car 2: Derailed and smashed (4420, 560, 260, 90) ─────────
+    c2x, c2y, c2w, c2h = 4420, 560, 260, 90
+    pygame.draw.rect(screen, body_main, apply_rect(pygame.Rect(c2x, c2y + 8, c2w, c2h - 8)))
+    pygame.draw.rect(screen, body_light, apply_rect(pygame.Rect(c2x + 6, c2y, c2w - 12, 11)))
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c2x + 6, c2y, c2w - 12, 11)), 1)
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c2x, c2y + c2h - 10, c2w, 5)))
+    # Broken windows (3 — dark inside, jagged glass edges)
+    for wi in range(3):
+        wx = c2x + 18 + wi * 78
+        pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(wx, c2y + 18, 52, 26)))
+        # Glass shards remaining at edges
+        pygame.draw.polygon(screen, glass, [
+            apply_pos((wx, c2y + 18)), apply_pos((wx + 12, c2y + 18)),
+            apply_pos((wx + 8, c2y + 32)), apply_pos((wx + 2, c2y + 28)),
+        ])
+        pygame.draw.polygon(screen, glass, [
+            apply_pos((wx + 52, c2y + 18)), apply_pos((wx + 40, c2y + 18)),
+            apply_pos((wx + 44, c2y + 26)),
+        ])
+    # Big crack / dent zig-zagging across the body
+    pygame.draw.lines(screen, body_dark, False, [
+        apply_pos((c2x + 30, c2y + 50)),
+        apply_pos((c2x + 70, c2y + 65)),
+        apply_pos((c2x + 110, c2y + 55)),
+        apply_pos((c2x + 150, c2y + 72)),
+        apply_pos((c2x + 200, c2y + 60)),
+    ], 4)
+    # Rust over the dent
+    pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(c2x + 60, c2y + 58, 30, 18)))
+    pygame.draw.rect(screen, rust_dark, apply_rect(pygame.Rect(c2x + 66, c2y + 62, 18, 8)))
+    pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(c2x + 200, c2y + 52, 25, 20)))
+    # Wheels — front one intact, middle missing (off the rail), rear intact
+    pygame.draw.circle(screen, wheel, apply_pos((c2x + 32, c2y + c2h + 4)), 12)
+    pygame.draw.circle(screen, wheel_hub, apply_pos((c2x + 32, c2y + c2h + 4)), 6)
+    pygame.draw.circle(screen, wheel, apply_pos((c2x + 220, c2y + c2h + 4)), 12)
+    pygame.draw.circle(screen, wheel_hub, apply_pos((c2x + 220, c2y + c2h + 4)), 6)
+    # Detached wheel rolled away
+    pygame.draw.circle(screen, wheel, apply_pos((c2x + 130, c2y + c2h + 12)), 10)
+    pygame.draw.circle(screen, wheel_hub, apply_pos((c2x + 130, c2y + c2h + 12)), 5)
+    # Coupler dangling
+    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(c2x - 22, c2y + c2h - 16, 24, 8)))
+
+    # ─── Tram Car 3: Overturned on its side (4730, 480, 240, 170) ──────
+    c3x, c3y, c3w, c3h = 4730, 480, 240, 170
+    # Body (now vertical since car is on its side)
+    pygame.draw.rect(screen, body_main, apply_rect(pygame.Rect(c3x + 10, c3y, c3w - 20, c3h)))
+    # "Roof" is now on the LEFT face (the curved side was on top before)
+    pygame.draw.rect(screen, body_light, apply_rect(pygame.Rect(c3x, c3y + 8, 14, c3h - 16)))
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c3x, c3y + 8, 14, c3h - 16)), 1)
+    # "Bottom" is now on the RIGHT face (where wheels stick out)
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c3x + c3w - 14, c3y + 8, 8, c3h - 16)))
+    # Windows now stacked vertically along the visible side
+    for wi in range(3):
+        wy = c3y + 22 + wi * 50
+        pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c3x + 70, wy, 36, 36)))   # broken interior
+        pygame.draw.polygon(screen, glass, [
+            apply_pos((c3x + 70, wy)), apply_pos((c3x + 82, wy)),
+            apply_pos((c3x + 78, wy + 14)),
+        ])
+        pygame.draw.polygon(screen, glass, [
+            apply_pos((c3x + 106, wy + 36)), apply_pos((c3x + 96, wy + 36)),
+            apply_pos((c3x + 102, wy + 22)),
+        ])
+    # Door now appears near the bottom of the visible side
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(c3x + 28, c3y + 130, 32, 32)))
+    pygame.draw.rect(screen, body_light, apply_rect(pygame.Rect(c3x + 28, c3y + 130, 32, 32)), 1)
+    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(c3x + 50, c3y + 144, 4, 5)))
+    # Wheels visible on the right side (sticking out — car is sideways)
+    for wy_off in [30, 90, 140]:
+        wx = c3x + c3w + 4
+        pygame.draw.circle(screen, wheel, apply_pos((wx, c3y + wy_off)), 13)
+        pygame.draw.circle(screen, wheel_hub, apply_pos((wx, c3y + wy_off)), 6)
+        pygame.draw.circle(screen, metal_dark, apply_pos((wx, c3y + wy_off)), 13, 2)
+    # Heavy rust patches all over this car
+    pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(c3x + 30, c3y + 60, 30, 32)))
+    pygame.draw.rect(screen, rust_dark, apply_rect(pygame.Rect(c3x + 36, c3y + 66, 18, 18)))
+    pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(c3x + 150, c3y + 100, 24, 28)))
+    pygame.draw.rect(screen, rust_dark, apply_rect(pygame.Rect(c3x + 156, c3y + 106, 14, 16)))
+    # Smoke billowing up from the wreck
+    pygame.draw.ellipse(screen, smoke, apply_rect(pygame.Rect(c3x + 70, c3y - 30, 50, 32)))
+    pygame.draw.ellipse(screen, smoke_light, apply_rect(pygame.Rect(c3x + 90, c3y - 55, 38, 30)))
+    pygame.draw.ellipse(screen, smoke, apply_rect(pygame.Rect(c3x + 110, c3y - 90, 60, 42)))
+    pygame.draw.ellipse(screen, smoke_light, apply_rect(pygame.Rect(c3x + 130, c3y - 130, 48, 38)))
+    pygame.draw.ellipse(screen, smoke, apply_rect(pygame.Rect(c3x + 80, c3y - 160, 80, 52)))
+    # Embers/sparks near the wreck
+    for ex, ey in [(c3x + 95, c3y + 15), (c3x + 130, c3y - 5), (c3x + 80, c3y - 8)]:
+        pygame.draw.circle(screen, ember, apply_pos((ex, ey)), 2)
+        pygame.draw.circle(screen, spark_hot, apply_pos((ex, ey)), 1)
+
+    # ─── Cab debris piece (4990, 580, 110, 70) ─────────────────────────
+    cx, cy, cw, ch = 4990, 580, 110, 70
+    pygame.draw.rect(screen, body_main, apply_rect(pygame.Rect(cx, cy + 6, cw, ch - 6)))
+    pygame.draw.rect(screen, body_light, apply_rect(pygame.Rect(cx + 2, cy, cw - 4, 10)))
+    pygame.draw.rect(screen, body_dark, apply_rect(pygame.Rect(cx, cy + ch - 6, cw, 4)))
+    # Driver's windshield (slanted broken)
+    pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(cx + 14, cy + 14, 42, 28)))
+    pygame.draw.rect(screen, glass_glow, apply_rect(pygame.Rect(cx + 18, cy + 18, 10, 5)))
+    # Crack across windshield
+    pygame.draw.line(screen, body_dark, apply_pos((cx + 14, cy + 18)), apply_pos((cx + 56, cy + 40)), 2)
+    pygame.draw.line(screen, body_dark, apply_pos((cx + 32, cy + 14)), apply_pos((cx + 40, cy + 42)), 1)
+    # Twisted metal sticking out the right side
+    pygame.draw.line(screen, metal, apply_pos((cx + cw, cy + 20)), apply_pos((cx + cw + 22, cy + 4)), 3)
+    pygame.draw.line(screen, metal, apply_pos((cx + cw + 22, cy + 4)), apply_pos((cx + cw + 35, cy + 30)), 3)
+    pygame.draw.line(screen, metal_dark, apply_pos((cx + cw + 8, cy + 35)), apply_pos((cx + cw + 28, cy + 50)), 2)
+    # Wheel
+    pygame.draw.circle(screen, wheel, apply_pos((cx + 25, cy + ch + 4)), 10)
+    pygame.draw.circle(screen, wheel_hub, apply_pos((cx + 25, cy + ch + 4)), 5)
+    # Headlight (broken, dim glow)
+    pygame.draw.circle(screen, (180, 180, 100), apply_pos((cx + 88, cy + 36)), 4)
+    pygame.draw.circle(screen, spark_hot, apply_pos((cx + 88, cy + 36)), 1)
+
+    # ─── Ground debris between/around the cars ─────────────────────────
+    # Broken glass shards
+    for gx in [4180, 4360, 4520, 4700, 4880, 5060]:
+        pygame.draw.polygon(screen, glass, [
+            apply_pos((gx, 646)), apply_pos((gx + 8, 644)), apply_pos((gx + 5, 650)),
+        ])
+        pygame.draw.rect(screen, glass_glow, apply_rect(pygame.Rect(gx + 1, 645, 2, 1)))
+    # Twisted metal scraps
+    for mx in [4200, 4380, 4640, 4940]:
+        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(mx, 643, 28, 7)))
+        pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(mx + 6, 641, 14, 4)))
+    # Spilled oil / dark stain under tram 2
+    pygame.draw.ellipse(screen, (15, 15, 22), apply_rect(pygame.Rect(c2x + 80, 644, 110, 8)))
+
+
 def draw_section_decorations(screen, camera):
     """
     Visual props (no collision) that make Map 0 sections feel ruined.
@@ -920,6 +1193,30 @@ def draw_section_decorations(screen, camera):
         pygame.draw.rect(screen, rune, apply_rect(pygame.Rect(rx, 644, 12, 2)))
         pygame.draw.rect(screen, rune, apply_rect(pygame.Rect(rx + 4, 640, 4, 8)))
 
+    # ─── Section 2: Chains hanging from floating block to the 3 pillars ──
+    # The big block top: pygame.Rect(1990, -30, 410, 140) -> bottom at y=110
+    # Pillar 1: Rect(1990, 280, 40, 300) -> top y=280, center x=2010
+    # Pillar 2: Rect(2100, 220, 40, 360) -> top y=220, center x=2120
+    # Pillar 3: Rect(2200, 300, 40, 360) -> top y=300, center x=2220
+    chain_rope = (60, 50, 40)
+    chain_link = (74, 70, 62)
+    chain_hook = (95, 85, 70)
+    chain_data = [
+        (2010, 110, 280),   # pillar 1: chain length 170
+        (2120, 110, 220),   # pillar 2: chain length 110
+        (2220, 110, 300),   # pillar 3: chain length 190
+    ]
+    for cx, top_y, bot_y in chain_data:
+        chain_h = bot_y - top_y
+        # Rope spine running from the block down to the pillar top
+        pygame.draw.rect(screen, chain_rope, apply_rect(pygame.Rect(cx, top_y, 4, chain_h)))
+        # Chain links every 18px along the rope
+        for ly in range(top_y + 8, bot_y - 8, 18):
+            pygame.draw.rect(screen, chain_link, apply_rect(pygame.Rect(cx - 3, ly, 10, 6)))
+        # Top hook attached to the block, bottom hook attached to the pillar
+        pygame.draw.rect(screen, chain_hook, apply_rect(pygame.Rect(cx - 5, top_y - 4, 14, 8)))
+        pygame.draw.rect(screen, chain_hook, apply_rect(pygame.Rect(cx - 5, bot_y - 6, 14, 10)))
+
     # ─── Section 3: Ruined Building Interior (x=2400-3900) ───────────────
     rope = (60, 50, 40)
     chain = (74, 70, 62)
@@ -1008,19 +1305,25 @@ def draw_level1_room_shells(screen, camera, game_map):
     wallpaper = (26, 30, 46)
     wallpaper_joint = (16, 19, 30)
 
+    tower_fill = (28, 32, 46)
+    tower_dark = (18, 21, 32)
+    tower_window = (8, 10, 18)
+
+    # === First pass: enclosed rooms (ceiling + walls) get void + wallpaper ===
+    handled_rects = set()
     for plat in game_map.platforms:
         if plat.y < 320 and plat.height <= 50 and plat.width >= 200:
             ceiling_bottom = plat.y + plat.height
-            # Find a wall inside this room (tall, narrow rect at the room's x range)
             wall_bottom = None
             for w in game_map.platforms:
                 if (w.height >= 150 and w.width <= 80
                         and plat.x <= w.x and w.right <= plat.right
                         and w.y >= ceiling_bottom):
                     wall_bottom = w.bottom if wall_bottom is None else max(wall_bottom, w.bottom)
-            # Fallback when no wall is detected — fill mid-room
             if wall_bottom is None:
-                wall_bottom = ceiling_bottom + 200
+                continue   # not an enclosed room — handled in second pass
+
+            handled_rects.add(id(plat))
 
             # Dark void above ceiling
             void = pygame.Rect(plat.x, plat.y - 400, plat.width, 400 + plat.height)
@@ -1032,9 +1335,44 @@ def draw_level1_room_shells(screen, camera, game_map):
             if interior_h > 0:
                 interior = pygame.Rect(plat.x, ceiling_bottom, plat.width, interior_h)
                 pygame.draw.rect(screen, wallpaper, apply_rect(interior))
-                # Subtle horizontal joint lines for stone wall texture
                 for jy in range(ceiling_bottom + 35, wall_bottom, 50):
                     pygame.draw.rect(screen, wallpaper_joint, apply_rect(pygame.Rect(plat.x, jy, plat.width, 2)))
+
+    # === Second pass: stacked outdoor slabs (rubble towers) get a tower fill ===
+    # Group platforms by horizontal overlap. If 2+ platforms share x range and are
+    # stacked vertically, draw a stone-tower background spanning their combined extent.
+    candidates = [p for p in game_map.platforms
+                  if p.width >= 100 and p.height <= 50 and p.bottom < 650 and id(p) not in handled_rects]
+    used = set()
+    for p in candidates:
+        if id(p) in used:
+            continue
+        group = [p]
+        for q in candidates:
+            if id(q) in used or q is p:
+                continue
+            # Same x range (within 20px tolerance on each side)
+            if abs(q.x - p.x) <= 20 and abs(q.right - p.right) <= 20:
+                group.append(q)
+        if len(group) < 2:
+            continue
+        for g in group:
+            used.add(id(g))
+        gx = min(g.x for g in group)
+        gright = max(g.right for g in group)
+        gtop = min(g.y for g in group)
+        gbottom = max(g.bottom for g in group)
+        # Extend the fill down to ground level so the tower meets the street
+        tower = pygame.Rect(gx, gtop, gright - gx, 650 - gtop)
+        pygame.draw.rect(screen, tower_fill, apply_rect(tower))
+        pygame.draw.rect(screen, tower_dark, apply_rect(tower), 3)
+        # Window holes — 3 columns, evenly spaced rows down the tower
+        col_count = max(1, (tower.width - 40) // 80)
+        col_step = (tower.width - 40) // max(1, col_count)
+        for row_y in range(gtop + 30, 650 - 40, 70):
+            for c in range(col_count):
+                wx = gx + 20 + c * col_step
+                pygame.draw.rect(screen, tower_window, apply_rect(pygame.Rect(wx, row_y, 30, 26)))
 
 class LevelManager:
     def __init__(self):
@@ -1060,22 +1398,44 @@ class LevelManager:
                     # mid-section: the pavement has buckled upward into a 2-tier slab.
                     # Looks intentional (an earthquake fault line), not random scattered pieces.
                     pygame.Rect(0, 650, 1100, 70),        # Long continuous street
-                    pygame.Rect(500, 580, 250, 70),       # Lower buckled slab (sits on ground)
-                    pygame.Rect(580, 510, 130, 70),       # Upper buckled slab (sits on lower slab)
+                    pygame.Rect(400, 580, 50, 70),       # Lower buckled slab (sits on ground)
+                    pygame.Rect(350, 530, 150, 40),       # Upper buckled slab (sits on lower slab)
+
+                    pygame.Rect(650, 440, 250, 40), 
+                    pygame.Rect(600, 400, 150, 40),  #second slab
+
+                    pygame.Rect(850, 260, 50, 40),
+
+                    pygame.Rect(900, 200, 30, 450), #wall
+                    pygame.Rect(900, -20, 30, 140),  
 
                     # ─── 2. Destroyed Street (1100-2400) ─────────────────────────────
                     # NO PITS — continuous ground. Two collapsed-wall structures + a tall
                     # rubble heap form natural climbing/jumping challenges along the route.
                     pygame.Rect(1100, 650, 1300, 70),     # Continuous ground (no holes)
                     # Collapsed wall structure 1: two-tier slab
-                    pygame.Rect(1200, 580, 300, 70),      # Wall fallen flat (lower slab)
-                    pygame.Rect(1280, 510, 200, 70),      # Upper section of fallen wall (sits on lower)
+                    pygame.Rect(930, 200, 70, 10),
+
+                    pygame.Rect(1040, 360, 300, 40),      # Wall fallen flat (lower slab)
+                         
+
+                    pygame.Rect(1040, 400, 60, 140), # tall wall sticking on "wall fallen flat"
+                    pygame.Rect(930, 580, 20, 40), #lowest small slab
+                    pygame.Rect(1000, 492, 60, 40),
+                    pygame.Rect(930, 380, 20, 40), 
+
                     # Tall building rubble heap mid-section
-                    pygame.Rect(1700, 540, 200, 110),     # Tall rubble pile (climbing block)
-                    pygame.Rect(1750, 460, 110, 80),      # Top piece sits on the rubble pile
-                    # Collapsed wall structure 2 near end (transition into building)
-                    pygame.Rect(2000, 580, 220, 70),      # Lower fallen wall
-                    pygame.Rect(2080, 510, 130, 70),      # Upper section (sits on lower)
+                    pygame.Rect(1500, 200, 300, 40),
+                    pygame.Rect(1500, 600, 300, 40),           # Tall rubble pile (climbing block)
+                    pygame.Rect(1450, 200, 50, 40),
+                    pygame.Rect(1800, 200, 50, 40),
+                    # second wall and building
+                    pygame.Rect(1990, 280, 40, 300),      # Lower fallen wall
+                    pygame.Rect(2100, 220, 40, 360),      # Upper section (sits on lower)
+                    pygame.Rect(2200, 300, 40, 360),
+                    pygame.Rect(1990, -30, 410, 140),
+                    pygame.Rect(2350, 400, 60, 20),
+                    pygame.Rect(2240, 500, 60, 20),
 
                     # ─── 3. Ruined Building Route (2400-3900) ────────────────────────
                     # TALL multi-story building with 5 floors of vertical exploration.
@@ -1089,7 +1449,7 @@ class LevelManager:
 
                     # Tall side walls — extend almost all the way to ground (y=60-580).
                     # The 70px gap below each wall is the doorway (player fits, 6px clearance).
-                    pygame.Rect(2400, 60, 30, 520),       # Left wall  (y=60-580)
+                    pygame.Rect(2400, 50, 30, 520),       # Left wall  (y=60-580)
                     pygame.Rect(3870, 140, 30, 520),       # Right wall (y=60-580)
 
                     # NO STAIRS — player jumps directly from ground to Floor 2 (140px jump,
@@ -1098,25 +1458,39 @@ class LevelManager:
                     # during ascent and lands on it during descent. No L-shape outside the
                     # building, no head-bumping mid-jump.
 
-                    # Floor 2 — LEFT-side balcony. Direct jump from ground.
-                    pygame.Rect(2440, 510, 690, 30),
+                    # Floor 2 — LEFT-side fat wall
+                    pygame.Rect(2440, 270, 160, 300),
+                    pygame.Rect(2770, 200, 160, 30),
+                    pygame.Rect(2690, 400, 160, 30),
 
                     # Floor 3 — RIGHT-side balcony. Reach: jump right + up from floor 2.
-                    pygame.Rect(3170, 380, 690, 30),
+                    pygame.Rect(3080, 570, 50, 90),
 
                     # Floor 4 — LEFT-side balcony. Reach: jump left + up from floor 3.
-                    pygame.Rect(2440, 250, 690, 30),
+                    pygame.Rect(2970, 520, 160, 30),
 
                     # Floor 5 — RIGHT-side TOP balcony. Reach: jump right + up from floor 4.
-                    pygame.Rect(3200, 160, 690, 30),
+                    pygame.Rect(3790, 160, 90, 30),
+                    pygame.Rect(3000, 160, 220, 30),
+
+                    #new part
+                    pygame.Rect(3200, 600, 140, 40), #first
+                    pygame.Rect(3440, 480, 170, 40), #second
+                    pygame.Rect(3480, 240, 190, 40), #above second
+                    pygame.Rect(3200, 360, 170, 40), #third  
+                    pygame.Rect(3200, 200, 80, 160), #third tall wall
+                    pygame.Rect(3830, 200, 40, 220), # wall on right side small platform
+                    pygame.Rect(3750, 420, 120, 40), #right side small platform
+                    pygame.Rect(3750, 460, 30, 40),
 
                     # ─── 4. Collapsed Transit / Tram Wreck (3900-5100) ───────────────
-                    # Crashed tram cars at varied heights. Walk on top of cars.
-                    pygame.Rect(3900, 650, 1200, 70),     # Ground
-                    pygame.Rect(4000, 540, 350, 110),     # Tram car 1
-                    pygame.Rect(4380, 580, 280, 70),      # Tram car 2 (lower/tilted)
-                    pygame.Rect(4690, 510, 220, 140),     # Tram car 3 (taller, upright)
-                    pygame.Rect(4940, 570, 130, 80),      # Crashed cab piece
+                    # 3 crashed tram cars + a cab debris piece. Detailed visuals are drawn
+                    # by draw_section4_tram_wreck (windows, doors, wheels, smoke, sparks).
+                    pygame.Rect(3900, 650, 1200, 70),     # Street ground (with rails on top)
+                    pygame.Rect(4030, 520, 360, 130),     # Tram car 1 — mostly intact, on wheels
+                    pygame.Rect(4420, 560, 260, 90),      # Tram car 2 — derailed lower, smashed
+                    pygame.Rect(4730, 480, 240, 170),     # Tram car 3 — overturned on its side
+                    pygame.Rect(4990, 580, 110, 70),      # Cab / control room debris piece
 
                     # ─── 5. Science District Exterior (5100-6400) ────────────────────
                     # Lab buildings forming a varied skyline. Climb across rooftops.
@@ -1347,7 +1721,7 @@ class LevelManager:
             if platform.y >= SCREEN_HEIGHT - 30:
                 continue
             # Skip very-high invisible collision ceilings (legacy).
-            if platform.y <= 50:
+            if platform.y <= 50 and platform.height <= 80:
                 continue
 
             draw_rect = platform
@@ -1358,6 +1732,8 @@ class LevelManager:
         # 5. Decorative props (no collision) — bones, blood, broken cars, signs, furniture.
         if self.current_map.map_id == 0:
             draw_section_decorations(screen, camera)
+            # Section 4 detailed tram-wreck visuals (overlay on top of the platform stones)
+            draw_section4_tram_wreck(screen, camera)
             draw_body_pile(screen, camera, 135, 650)
 
         # 6. UI / Interactive Elements Layer

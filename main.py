@@ -33,6 +33,7 @@ from settings import (
 )
 from src.core.camera import Camera
 from src.entities.enemy import Enemy
+from src.entities.moon_shard import MoonShard
 from src.entities.player import Player
 from src.levels.level_manager import LevelManager
 from src.systems.coin import Coin
@@ -61,9 +62,11 @@ def main():
     level_manager = LevelManager()
     player = Player(100, 500)
     enemy = Enemy(0, 0)
+    moon_shard = MoonShard()
     current_map = level_manager.get_current_map()
     camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, current_map.width, current_map.height)
     level_manager.change_map(0, player, enemy, camera)
+    moon_shard.reset_to(player.rect, player.facing)
     initial_shop_rect = level_manager.get_shop_rect()
 
     if initial_shop_rect is None:
@@ -112,6 +115,7 @@ def main():
         if shop_rect is not None:
             shop.set_rect(shop_rect)
             shop.refresh_products()
+        moon_shard.reset_to(player.rect, player.facing)
         return True
 
     def restart_game():
@@ -258,6 +262,10 @@ def main():
                 effect.update(dt)
             active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
 
+        # Moon shard floats with the player even while paused (gives life to the scene).
+        # Trails on the opposite side of the player's facing direction.
+        moon_shard.update(dt, player.rect, player.facing)
+
         #screen.fill((18, 20, 30))# Background is drawn inside level_manager.draw_current_map()
 
         level_manager.draw_current_map(screen, camera)
@@ -292,6 +300,8 @@ def main():
 
         enemy.draw(screen, camera)
         player.draw(screen, camera)
+        # Moon shard renders on top so its glow doesn't get hidden behind the player.
+        moon_shard.draw(screen, camera)
 
         weapon = get_weapon(player.current_weapon_id)
         if player.is_attacking and weapon["weapon_type"] != "projectile":

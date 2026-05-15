@@ -450,12 +450,12 @@ class Player:
     def move_x(self, platforms):
         self.rect.x += self.vel_x
 
-        for platform in platforms:
-            if self.rect.colliderect(platform):
-                if self.vel_x > 0:
-                    self.rect.right = platform.left
-                elif self.vel_x < 0:
-                    self.rect.left = platform.right
+        # for platform in platforms:
+        #     if self.rect.colliderect(platform):
+        #         if self.vel_x > 0:
+        #             self.rect.right = platform.left
+        #         elif self.vel_x < 0:
+        #             self.rect.left = platform.right
 
     def move_y(self, platforms):
         self.rect.y += self.vel_y
