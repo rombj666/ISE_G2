@@ -38,6 +38,7 @@ from src.entities.player import Player
 from src.levels.level_manager import LevelManager
 from src.systems.coin import Coin
 from src.systems.combat import calculate_damage
+from src.systems.dev_teleport import DevTeleport
 from src.systems.projectile import Projectile, ReturningShield
 from src.systems.shop import Shop
 from src.systems.skills import (
@@ -90,6 +91,24 @@ def main():
     grapple_special_hitbox = None
     grapple_special_timer = 0
     game_state = "playing"
+
+    
+    dev_teleport = DevTeleport()
+
+    def teleport_player_to(pos):
+        """Snap the player to a world position (only works in Map 0 — dev tool)."""
+        if level_manager.get_current_map().map_id != 0:
+            level_manager.change_map(0, player, enemy, camera)
+        player.rect.midbottom = pos
+        player.vel_x = 0
+        player.vel_y = 0
+        player.is_dashing = False
+        player.is_attacking = False
+        player.is_auto_grappling = False
+        player.is_blocking = False
+        player.is_parrying = False
+        camera.snap_to(player.rect)
+        moon_shard.reset_to(player.rect, player.facing)
 
     def clear_world_objects():
         nonlocal u_was_pressed, grapple_special_hitbox, grapple_special_timer
@@ -148,7 +167,35 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Dev teleport — click on a button in the overlay
+                if dev_teleport.visible:
+                    section_idx = dev_teleport.handle_click(event.pos)
+                    if section_idx is not None:
+                        target = dev_teleport.get_position(section_idx)
+                        if target is not None:
+                            teleport_player_to(target)
+                            dev_teleport.close()
             elif event.type == pygame.KEYDOWN:
+
+                                # ----- Dev teleport (F3) takes priority over everything else -----
+                if event.key == pygame.K_F3:
+                    dev_teleport.toggle()
+                    continue
+
+                if dev_teleport.visible:
+                    if event.key == pygame.K_ESCAPE:
+                        dev_teleport.close()
+                        continue
+                    section_idx = dev_teleport.handle_key(event.key)
+                    if section_idx is not None:
+                        target = dev_teleport.get_position(section_idx)
+                        if target is not None:
+                            teleport_player_to(target)
+                            dev_teleport.close()
+                    continue   # while overlay is open, swallow other keys
+                # ----------------------------------------------------------------
+
                 if game_state in ("game_over", "victory"):
                     if event.key == pygame.K_r:
                         restart_game()
@@ -199,9 +246,24 @@ def main():
 
         if game_state == "playing" and not player.is_dead and not shop.is_open:
             player.handle_input(keys)
+            previous_map_id = current_map.map_id
             player.update(dt, platforms, keys)
+            level_manager.update_collapsing_lift(dt, player)
+
+            transition_target = level_manager.get_collapsing_lift_transition_target(player)
+            if transition_target is not None:
+                if isinstance(transition_target, int):
+                    enter_map(transition_target)
+                elif transition_target == "victory":
+                    game_state = "victory"
+
+            current_map = level_manager.get_current_map()
+            map_changed = previous_map_id != current_map.map_id
+
+            if not map_changed and level_manager.is_player_in_deadly_void(player):
+                kill_player_instantly(player)
+
             clamp_player_to_map(player, current_map)
-            map_changed = current_map.map_id != level_manager.get_current_map().map_id
 
             if k_pressed and not map_changed:
                 activate_current_skill(
@@ -266,6 +328,10 @@ def main():
         # Trails on the opposite side of the player's facing direction.
         moon_shard.update(dt, player.rect, player.facing)
 
+        
+        # Dev teleport hover highlight
+        dev_teleport.update_hover(pygame.mouse.get_pos())
+
         #screen.fill((18, 20, 30))# Background is drawn inside level_manager.draw_current_map()
 
         level_manager.draw_current_map(screen, camera)
@@ -276,9 +342,11 @@ def main():
         if shop_active:
             shop.draw_shop_area(screen, camera)
 
-        for fulcrum in fulcrums:
-            pygame.draw.circle(screen, (150, 80, 230), camera.apply_pos(fulcrum["anchor"]), FULCRUM_RADIUS)
-            pygame.draw.rect(screen, (150, 80, 230), camera.apply_rect(fulcrum["rect"]), 1)
+        # Grapple fulcrum marker (purple circle + box). The grapple still works;
+        # this only hides the visible debug-looking marker.
+        # for fulcrum in fulcrums:
+        #     pygame.draw.circle(screen, (150, 80, 230), camera.apply_pos(fulcrum["anchor"]), FULCRUM_RADIUS)
+        #     pygame.draw.rect(screen, (150, 80, 230), camera.apply_rect(fulcrum["rect"]), 1)
 
         for coin in coins:
             coin.draw(screen, camera)
@@ -337,6 +405,9 @@ def main():
             draw_popup(screen, "GAME OVER", "You were defeated.")
         elif game_state == "victory":
             draw_popup(screen, "PROTOTYPE COMPLETE", "You reached the final door.")
+
+         # Dev teleport overlay — drawn last so it sits on top of everything
+        dev_teleport.draw(screen)
 
         if PIXELATE_GAME:
             small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
@@ -667,6 +738,20 @@ def clamp_player_to_map(player, game_map):
         player.rect.bottom = game_map.height
         player.vel_y = 0
         player.on_ground = True
+
+
+def kill_player_instantly(player):
+    player.current_hp = 0
+    player.hp = 0
+    player.is_dead = True
+    player.invincible_timer = 0
+    player.vel_x = 0
+    player.vel_y = 0
+    player.is_dashing = False
+    player.is_attacking = False
+    player.is_auto_grappling = False
+    player.is_blocking = False
+    player.is_parrying = False
 
 
 def get_nearby_fulcrum(player, fulcrums):
