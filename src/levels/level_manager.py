@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 import pygame
 
@@ -15,6 +16,7 @@ from settings import (
     SCREEN_HEIGHT,
 )
 from src.levels.game_map import GameMap
+from src.levels.tiled_map_loader import load_tiled_map
 
 def draw_pixel_stone_face(screen, rect, top_color, face_color, dark_color, glow_color):
     """
@@ -2186,6 +2188,166 @@ def draw_level1_room_shells(screen, camera, game_map):
                 wx = gx + 20 + c * col_step
                 pygame.draw.rect(screen, tower_window, apply_rect(pygame.Rect(wx, row_y, 30, 26)))
 
+
+def draw_map1_underground_background(screen, camera, game_map):
+    """Dark underground checkpoint backdrop for the Tiled MAP 1 room."""
+    def apply_rect(rect):
+        return camera.apply_rect(rect) if camera is not None else rect
+
+    def apply_pos(pos):
+        return camera.apply_pos(pos) if camera is not None else pos
+
+    def rect(x, y, w, h, color):
+        pygame.draw.rect(screen, color, apply_rect(pygame.Rect(x, y, w, h)))
+
+    def line(start, end, color, width=1):
+        pygame.draw.line(screen, color, apply_pos(start), apply_pos(end), width)
+
+    bg = (5, 6, 10)
+    wall = (10, 12, 18)
+    wall_mid = (16, 18, 26)
+    wall_light = (24, 27, 38)
+    crack = (3, 4, 8)
+    metal = (42, 48, 61)
+    metal_dark = (24, 28, 37)
+    blue = (65, 190, 226)
+    moon = (190, 205, 226)
+    moon_glow = (40, 55, 78)
+    amber = (155, 105, 42)
+
+    # Solid underground darkness. This fully hides the outside skyline.
+    rect(0, 0, game_map.width, game_map.height, bg)
+    rect(0, 110, game_map.width, 520, wall)
+
+    # Heavy stone ceiling and lower foundation.
+    rect(0, 0, game_map.width, 118, (12, 13, 18))
+    rect(0, 118, game_map.width, 10, metal_dark)
+    rect(0, 626, game_map.width, 94, (12, 13, 18))
+    rect(0, 626, game_map.width, 5, metal)
+
+    # Large carved stone wall panels, not buildings.
+    panel_w = 210
+    for i, x in enumerate(range(45, game_map.width, panel_w)):
+        panel_h = 390 if i % 2 == 0 else 330
+        y = 178 if i % 3 != 0 else 220
+        rect(x, y, panel_w - 42, panel_h, wall_mid)
+        rect(x + 8, y + 8, panel_w - 58, panel_h - 16, wall)
+        rect(x, y, panel_w - 42, 5, wall_light)
+        rect(x, y + panel_h - 5, panel_w - 42, 5, crack)
+
+        # Chipped stone marks and horizontal seams.
+        for sy in range(y + 54, y + panel_h - 30, 68):
+            rect(x + 22, sy, 36, 4, crack)
+            rect(x + 88, sy + 18, 52, 4, (22, 25, 35))
+        for cx, cy in [(x + 34, y + 28), (x + 120, y + 78), (x + 70, y + panel_h - 54)]:
+            line((cx, cy), (cx + 14, cy + 11), crack, 3)
+            line((cx + 14, cy + 11), (cx + 10, cy + 23), crack, 2)
+
+    # Support columns and braces built into the underground wall.
+    for x in (145, 420, 720, 1010, 1325):
+        rect(x, 128, 18, 498, metal_dark)
+        rect(x + 4, 128, 6, 498, metal)
+        for y in range(155, 602, 56):
+            rect(x - 8, y, 34, 5, metal)
+    for x1, x2, y in [(170, 310, 205), (460, 620, 255), (770, 930, 205), (1060, 1230, 250)]:
+        line((x1, y), (x2, y + 42), metal_dark, 3)
+        line((x2, y + 42), (x2 + 80, y + 18), metal_dark, 3)
+
+    # Pipes and old sanctuary utilities.
+    for y, color in [(156, metal_dark), (172, metal), (198, metal_dark)]:
+        rect(0, y, game_map.width, 5, color)
+    for x in range(80, game_map.width, 260):
+        rect(x, 146, 34, 18, metal_dark)
+        rect(x + 8, 150, 18, 4, blue)
+    for x in (585, 1165):
+        rect(x, 198, 10, 148, metal_dark)
+        rect(x - 6, 334, 22, 8, metal)
+        rect(x - 4, 344, 18, 42, metal_dark)
+
+    # Small barred moonlight grate. A little outside light, not an open city view.
+    grate = pygame.Rect(1008, 72, 112, 48)
+    rect(grate.x - 10, grate.y - 8, grate.width + 20, grate.height + 16, (20, 24, 34))
+    rect(grate.x, grate.y, grate.width, grate.height, (7, 9, 15))
+    pygame.draw.circle(screen, moon, apply_pos((grate.centerx + 18, grate.centery)), 18)
+    for bx in range(grate.x + 14, grate.right, 18):
+        rect(bx, grate.y, 5, grate.height, metal_dark)
+    rect(grate.x, grate.y, grate.width, 5, metal)
+    rect(grate.x, grate.bottom - 5, grate.width, 5, metal)
+    rect(grate.centerx - 52, grate.bottom + 12, 150, 18, moon_glow)
+    rect(grate.centerx - 32, grate.bottom + 44, 105, 14, moon_glow)
+    rect(grate.centerx - 10, grate.bottom + 72, 62, 10, moon_glow)
+
+    # Rubble, drains, and floor-level details.
+    for x in range(30, game_map.width, 170):
+        rect(x, 604, 18, 4, blue)
+        rect(x + 42, 610, 28, 5, crack)
+    for x, y, w in [(210, 590, 46), (486, 612, 65), (820, 596, 38), (1210, 612, 74), (1410, 590, 42)]:
+        rect(x, y, w, 8, wall_light)
+        rect(x + 8, y - 8, max(12, w - 20), 8, wall_mid)
+    for x, y in [(330, 300), (690, 410), (945, 260), (1185, 372), (1390, 285)]:
+        rect(x, y, 3, 3, (55, 65, 86))
+    for x in (66, 930, 1450):
+        rect(x, 528, 28, 54, metal_dark)
+        rect(x + 5, 538, 18, 4, amber)
+        rect(x + 6, 554, 16, 4, amber)
+
+def draw_map1_moon_altar(screen, camera, altar_rect, used):
+    """Small one-use healing altar for the checkpoint map."""
+    if altar_rect is None:
+        return
+
+    def apply_rect(rect):
+        return camera.apply_rect(rect) if camera is not None else rect
+
+    def apply_pos(pos):
+        return camera.apply_pos(pos) if camera is not None else pos
+
+    x = altar_rect.x
+    y = altar_rect.y
+    w = altar_rect.width
+    h = altar_rect.height
+
+    stone_dark = (29, 32, 44)
+    stone = (58, 63, 82)
+    stone_light = (122, 132, 154)
+    gold = (208, 170, 78)
+    gold_dark = (104, 77, 38)
+    glow = (90, 204, 238) if not used else (70, 78, 92)
+    glow_soft = (35, 82, 116) if not used else (28, 32, 42)
+    core = (225, 246, 255) if not used else (118, 126, 140)
+    dim = (16, 18, 26)
+
+    # Base steps.
+    pygame.draw.rect(screen, stone_dark, apply_rect(pygame.Rect(x + 6, y + h - 16, w - 12, 16)))
+    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + 14, y + h - 28, w - 28, 14)))
+    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + 14, y + h - 28, w - 28, 3)))
+    pygame.draw.rect(screen, gold_dark, apply_rect(pygame.Rect(x + 22, y + h - 34, w - 44, 8)))
+    pygame.draw.rect(screen, gold, apply_rect(pygame.Rect(x + 27, y + h - 36, w - 54, 3)))
+
+    # Twin pillars.
+    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + 12, y + 26, 8, 34)))
+    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + w - 20, y + 26, 8, 34)))
+    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + 10, y + 24, 12, 5)))
+    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + w - 22, y + 24, 12, 5)))
+
+    # Moon core and glow.
+    center = (x + w // 2, y + 24)
+    if not used:
+        pygame.draw.circle(screen, glow_soft, apply_pos(center), 31)
+        pygame.draw.circle(screen, glow, apply_pos(center), 20)
+    else:
+        pygame.draw.circle(screen, dim, apply_pos(center), 22)
+        pygame.draw.circle(screen, stone, apply_pos(center), 16)
+
+    pygame.draw.circle(screen, core, apply_pos(center), 10)
+    pygame.draw.circle(screen, glow, apply_pos((center[0] + 5, center[1] - 1)), 8)
+    pygame.draw.circle(screen, dim, apply_pos((center[0] + 9, center[1] - 2)), 8)
+
+    # Small rune lights.
+    rune_color = glow if not used else stone
+    for rx, ry in [(x + 25, y + h - 20), (x + w // 2 - 3, y + h - 22), (x + w - 31, y + h - 20)]:
+        pygame.draw.rect(screen, rune_color, apply_rect(pygame.Rect(rx, ry, 6, 3)))
+
 class LevelManager:
     def __init__(self):
         self.maps = self.build_maps()
@@ -2203,6 +2365,82 @@ class LevelManager:
                 pygame.Rect(9500, SCREEN_HEIGHT - 40, 1755, 60),
             ]
         }
+        self.map1_moon_altar_rect = pygame.Rect(1218, 536, 82, 68)
+        self.map1_moon_altar_used = False
+
+
+    def build_default_map1(self):
+        return GameMap(
+            1,
+            "The Warden - Boss Arena",
+            MAP_1_WIDTH,
+            MAP_1_HEIGHT,
+            [
+                pygame.Rect(0, 650, MAP_1_WIDTH, 70),
+                pygame.Rect(0, 200, MAP_1_WIDTH, 40),
+                pygame.Rect(0, 240, 30, 410),
+                pygame.Rect(MAP_1_WIDTH - 30, 240, 30, 410),
+                pygame.Rect(150, 540, 200, 110),
+                pygame.Rect(MAP_1_WIDTH - 350, 540, 200, 110),
+                pygame.Rect(0, SCREEN_HEIGHT - 20, MAP_1_WIDTH, 20),
+            ],
+            (100, 650),
+            [
+                {
+                    "rect": pygame.Rect(MAP_1_WIDTH - 120, 550, DOOR_WIDTH, DOOR_HEIGHT),
+                    "target_map": 2,
+                    "label": "Resting Area",
+                }
+            ],
+            boss_spawn=(MAP_1_WIDTH // 2, 590),
+            map_type="boss_stage",
+        )
+
+    def build_tiled_map1(self):
+        map_path = Path(__file__).resolve().parents[2] / "assets" / "maps" / "map1.json"
+        tiled = load_tiled_map(map_path)
+
+        if tiled is None or not tiled["platforms"]:
+            return self.build_default_map1()
+
+        player_spawn = tiled["player_spawn"]
+        if player_spawn is None and tiled["moving_platforms"]:
+            first_lift = tiled["moving_platforms"][0].rect
+            player_spawn = (first_lift.centerx, first_lift.top)
+        if player_spawn is None:
+            player_spawn = (100, 650)
+
+        doors = tiled["doors"] or [
+            {
+                "rect": pygame.Rect(MAP_1_WIDTH - 70, 120, 70, 180),
+                "target_map": 2,
+                "label": "Level 2",
+                "visible": False,
+                "auto": True,
+            }
+        ]
+
+        # Default MAP 1 shop position. If you add an Interactables/merchant object
+        # in Tiled later, that Tiled rectangle will override this fallback.
+        map1_shop_rect = tiled["shop_rect"] or pygame.Rect(520, 506, 150, 90)
+
+        return GameMap(
+            1,
+            "Checkpoint - Lower Sanctuary",
+            tiled["width"] or MAP_1_WIDTH,
+            tiled["height"] or MAP_1_HEIGHT,
+            tiled["platforms"],
+            player_spawn,
+            doors,
+            enemy_spawns=tiled["enemy_spawns"],
+            boss_spawn=tiled["boss_spawn"],
+            shop_rect=map1_shop_rect,
+            moving_platforms=tiled["moving_platforms"],
+            checkpoints=tiled["checkpoints"],
+            interactables=tiled["interactables"],
+            hazards=tiled["hazards"],
+            map_type="checkpoint_stage",
+        )
 
     def build_maps(self):
         return {
@@ -2405,33 +2643,9 @@ class LevelManager:
             ),
 
             # =========================================================================
-            # MAP 1: LEVEL 1 BOSS — The Warden Arena
+            # MAP 1: Checkpoint / Tiled map
             # =========================================================================
-            1: GameMap(
-                1,
-                "The Warden — Boss Arena",
-                MAP_1_WIDTH,
-                MAP_1_HEIGHT,
-                [
-                    pygame.Rect(0, 650, MAP_1_WIDTH, 70),                # Arena floor
-                    pygame.Rect(0, 200, MAP_1_WIDTH, 40),                # Ceiling
-                    pygame.Rect(0, 240, 30, 410),                        # Left wall
-                    pygame.Rect(MAP_1_WIDTH - 30, 240, 30, 410),         # Right wall
-                    pygame.Rect(150, 540, 200, 110),                     # Tactical block left
-                    pygame.Rect(MAP_1_WIDTH - 350, 540, 200, 110),       # Tactical block right
-                    pygame.Rect(0, SCREEN_HEIGHT - 20, MAP_1_WIDTH, 20),
-                ],
-                (100, 650),
-                [
-                    {
-                        "rect": pygame.Rect(MAP_1_WIDTH - 120, 550, DOOR_WIDTH, DOOR_HEIGHT),
-                        "target_map": 2,
-                        "label": "Resting Area",
-                    }
-                ],
-                boss_spawn=(MAP_1_WIDTH // 2, 590),
-                map_type="boss_stage",
-            ),
+            1: self.build_tiled_map1(),
 
             # =========================================================================
             # MAP 2: Resting Area — Checkpoint + transition to Level 2
@@ -2461,8 +2675,48 @@ class LevelManager:
             ),
         }
 
+
+    def reset_one_use_items(self):
+        self.map1_moon_altar_used = False
+
+    def get_moon_altar_rect(self):
+        if self.current_map_id != 1:
+            return None
+        return self.map1_moon_altar_rect
+
+    def can_use_moon_altar(self, player):
+        altar_rect = self.get_moon_altar_rect()
+        if altar_rect is None or self.map1_moon_altar_used:
+            return False
+
+        interaction_rect = altar_rect.inflate(64, 44)
+        return player.rect.colliderect(interaction_rect)
+
+    def use_moon_altar(self, player):
+        if not self.can_use_moon_altar(player):
+            return False
+
+        player.current_hp = player.max_hp
+        player.hp = player.current_hp
+        player.current_mana = player.max_mana
+        player.mana = player.current_mana
+        player.current_stamina = player.max_stamina
+        player.stamina_recover_delay_timer = 0
+        player.invincible_timer = 0
+        self.map1_moon_altar_used = True
+        return True
+
     def get_current_map(self):
         return self.current_map
+
+
+    def reset_current_moving_platforms(self):
+        for moving_platform in self.current_map.moving_platforms:
+            moving_platform.reset()
+
+    def update_moving_platforms(self, dt, player):
+        for moving_platform in self.current_map.moving_platforms:
+            moving_platform.update(dt, player)
 
     def is_player_in_deadly_void(self, player):
         voids = self.deadly_voids.get(self.current_map_id, [])
@@ -2471,6 +2725,12 @@ class LevelManager:
         for void in voids:
             if foot_sensor.colliderect(void):
                 return True
+
+        for hazard in self.current_map.hazards:
+            if hazard["rect"].colliderect(foot_sensor):
+                damage = str(hazard.get("damage", "instant")).lower()
+                if damage in ("instant", "death", "kill"):
+                    return True
 
         return False
 
@@ -2571,6 +2831,8 @@ class LevelManager:
         if target_map_id == 0:
             self.reset_collapsing_lift()
 
+        self.reset_current_moving_platforms()
+
         player.rect.midbottom = self.current_map.player_spawn
         player.vel_x = 0
         player.vel_y = 0
@@ -2627,23 +2889,26 @@ class LevelManager:
     def draw_current_map(self, screen, camera):
         font = pygame.font.Font(None, 28)
 
-        # 1. Background (moon, stars, distant city silhouette)
-        draw_moon_background(screen, camera, self.current_map)
+        if self.current_map.map_id == 1:
+            draw_map1_underground_background(screen, camera, self.current_map)
+        else:
+            # 1. Background (moon, stars, distant city silhouette)
+            draw_moon_background(screen, camera, self.current_map)
 
-        # 2. Enclosed-room shells: dark void above ceilings + stone interior fill.
-        #    Auto-detects ceiling rects in any map's platform list.
-        draw_level1_room_shells(screen, camera, self.current_map)
+            # 2. Enclosed-room shells: dark void above ceilings + stone interior fill.
+            #    Auto-detects ceiling rects in any map's platform list.
+            draw_level1_room_shells(screen, camera, self.current_map)
 
-        # 3. Street embankment behind ground islands.
-        #    Auto-detects ground rects (y=650, h=70) in any map's platform list.
-        draw_level1_wall_masses(screen, camera, self.current_map)
+            # 3. Street embankment behind ground islands.
+            #    Auto-detects ground rects (y=650, h=70) in any map's platform list.
+            draw_level1_wall_masses(screen, camera, self.current_map)
 
-        # 3b. Section 5 + Section 6 background buildings — drawn BEHIND platforms
-        #     so the platforms read as balconies / rooftops on the buildings.
-        if self.current_map.map_id == 0:
-            draw_section5_science_buildings(screen, camera)
-            draw_section6_courtyard_buildings(screen, camera)
-            draw_section8_collapsed_city_background(screen, camera)
+            # 3b. Section 5 + Section 6 background buildings - drawn BEHIND platforms
+            #     so the platforms read as balconies / rooftops on the buildings.
+            if self.current_map.map_id == 0:
+                draw_section5_science_buildings(screen, camera)
+                draw_section6_courtyard_buildings(screen, camera)
+                draw_section8_collapsed_city_background(screen, camera)
 
         # 4. Foreground platforms (ground, ledges, rubble, pillars, ceilings).
         #    draw_moon_platform picks the right visual based on rect shape.
@@ -2659,6 +2924,9 @@ class LevelManager:
             if camera is not None:
                 draw_rect = camera.apply_rect(platform)
             draw_moon_platform(screen, draw_rect)
+
+        if self.current_map.map_id == 1:
+            draw_map1_moon_altar(screen, camera, self.map1_moon_altar_rect, self.map1_moon_altar_used)
 
         # 5. Decorative props (no collision) — bones, blood, broken cars, signs, furniture.
         if self.current_map.map_id == 0:
@@ -2680,6 +2948,9 @@ class LevelManager:
             return
 
         for door in self.current_map.doors:
+            if door.get("visible", True) is False:
+                continue
+
             draw_rect = door["rect"]
             if camera is not None:
                 draw_rect = camera.apply_rect(door["rect"])
@@ -2694,6 +2965,17 @@ class LevelManager:
 
         for door in self.current_map.doors:
             if player.rect.colliderect(door["rect"]):
+                return door
+
+        return None
+
+
+    def check_auto_doors(self, player):
+        if self.current_map_id == 0:
+            return None
+
+        for door in self.current_map.doors:
+            if door.get("auto", False) and player.rect.colliderect(door["rect"]):
                 return door
 
         return None

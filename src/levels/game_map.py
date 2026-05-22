@@ -13,6 +13,10 @@ class GameMap:
         fulcrums=None,
         shop_rect=None,
         shop_slots=None,
+        moving_platforms=None,
+        checkpoints=None,
+        interactables=None,
+        hazards=None,
         map_type="normal_stage",
     ):
         self.map_id = map_id
@@ -27,4 +31,8 @@ class GameMap:
         self.fulcrums = fulcrums or []
         self.shop_rect = shop_rect
         self.shop_slots = shop_slots or []
+        self.moving_platforms = moving_platforms or []
+        self.checkpoints = checkpoints or []
+        self.interactables = interactables or []
+        self.hazards = hazards or []
         self.map_type = map_type

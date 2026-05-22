@@ -95,11 +95,22 @@ def main():
     
     dev_teleport = DevTeleport()
 
-    def teleport_player_to(pos):
-        """Snap the player to a world position (only works in Map 0 — dev tool)."""
-        if level_manager.get_current_map().map_id != 0:
-            level_manager.change_map(0, player, enemy, camera)
-        player.rect.midbottom = pos
+    def teleport_player_to(target):
+        """Snap the player to a dev teleport target on any map."""
+        if isinstance(target, dict):
+            target_map_id = target.get("map_id", 0)
+            pos = target.get("pos")
+        else:
+            target_map_id = 0
+            pos = target
+
+        if level_manager.get_current_map().map_id != target_map_id:
+            if not enter_map(target_map_id):
+                return
+
+        if pos is not None:
+            player.rect.midbottom = pos
+
         player.vel_x = 0
         player.vel_y = 0
         player.is_dashing = False
@@ -144,6 +155,7 @@ def main():
         player.current_mana = player.max_mana
         player.mana = player.current_mana
         player.current_stamina = player.max_stamina
+        level_manager.reset_one_use_items()
         player.is_dead = False
         player.invincible_timer = 0
         player.vel_x = 0
@@ -172,7 +184,7 @@ def main():
                 if dev_teleport.visible:
                     section_idx = dev_teleport.handle_click(event.pos)
                     if section_idx is not None:
-                        target = dev_teleport.get_position(section_idx)
+                        target = dev_teleport.get_target(section_idx)
                         if target is not None:
                             teleport_player_to(target)
                             dev_teleport.close()
@@ -189,7 +201,7 @@ def main():
                         continue
                     section_idx = dev_teleport.handle_key(event.key)
                     if section_idx is not None:
-                        target = dev_teleport.get_position(section_idx)
+                        target = dev_teleport.get_target(section_idx)
                         if target is not None:
                             teleport_player_to(target)
                             dev_teleport.close()
@@ -210,7 +222,9 @@ def main():
                     player.toggle_unlimited_mana()
 
                 if event.key == pygame.K_e:
-                    if shop_active and shop.can_interact(player):
+                    if level_manager.use_moon_altar(player):
+                        pass
+                    elif shop_active and shop.can_interact(player):
                         shop.toggle()
                     elif nearby_door is not None:
                         target_map = nearby_door["target_map"]
@@ -249,6 +263,7 @@ def main():
             previous_map_id = current_map.map_id
             player.update(dt, platforms, keys)
             level_manager.update_collapsing_lift(dt, player)
+            level_manager.update_moving_platforms(dt, player)
 
             transition_target = level_manager.get_collapsing_lift_transition_target(player)
             if transition_target is not None:
@@ -259,6 +274,17 @@ def main():
 
             current_map = level_manager.get_current_map()
             map_changed = previous_map_id != current_map.map_id
+
+            if not map_changed:
+                auto_door = level_manager.check_auto_doors(player)
+                if auto_door is not None:
+                    target_map = auto_door["target_map"]
+                    if isinstance(target_map, int):
+                        enter_map(target_map)
+                    elif target_map == "victory":
+                        game_state = "victory"
+                    current_map = level_manager.get_current_map()
+                    map_changed = True
 
             if not map_changed and level_manager.is_player_in_deadly_void(player):
                 kill_player_instantly(player)
@@ -337,7 +363,7 @@ def main():
         level_manager.draw_current_map(screen, camera)
 
         current_map = level_manager.get_current_map()
-        shop_active = current_map.map_id == 0 and level_manager.get_shop_rect() is not None
+        shop_active = level_manager.get_shop_rect() is not None
 
         if shop_active:
             shop.draw_shop_area(screen, camera)
@@ -384,6 +410,9 @@ def main():
         nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
         if nearby_fulcrum is not None and not player.is_auto_grappling:
             draw_interaction_text(screen, player, camera)
+
+        if level_manager.can_use_moon_altar(player) and not shop.is_open:
+            draw_moon_altar_interaction_text(screen, level_manager.get_moon_altar_rect(), camera)
 
         if shop_active and shop.can_interact(player) and not shop.is_open:
             draw_shop_interaction_text(screen, shop, camera)
@@ -781,6 +810,15 @@ def draw_interaction_text(screen, player, camera=None):
         pos = camera.apply_pos(pos)
     text_rect = text.get_rect(midbottom=pos)
     screen.blit(text, text_rect)
+
+
+def draw_moon_altar_interaction_text(screen, altar_rect, camera=None):
+    font = pygame.font.Font(None, 26)
+    text = font.render("Press E to restore at Moon Altar", True, (190, 235, 255))
+    pos = (altar_rect.centerx, altar_rect.top - 14)
+    if camera:
+        pos = camera.apply_pos(pos)
+    screen.blit(text, text.get_rect(center=pos))
 
 
 def draw_shop_interaction_text(screen, shop, camera=None):
