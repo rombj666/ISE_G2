@@ -167,6 +167,7 @@ def main():
     while running:
         dt = clock.tick(FPS) / 1000
         e_pressed = False
+        e_released = False
         k_pressed = False
         current_map = level_manager.get_current_map()
         shop_active = level_manager.get_shop_rect() is not None
@@ -188,6 +189,9 @@ def main():
                         if target is not None:
                             teleport_player_to(target)
                             dev_teleport.close()
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_e:
+                    e_released = True
             elif event.type == pygame.KEYDOWN:
 
                                 # ----- Dev teleport (F3) takes priority over everything else -----
@@ -303,7 +307,13 @@ def main():
             nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
 
             if e_pressed and nearby_fulcrum is not None and not map_changed:
-                player.start_auto_grapple(nearby_fulcrum["anchor"], nearby_fulcrum["target"])
+                if current_map.map_id == 2:
+                    player.start_swing(nearby_fulcrum["anchor"])
+                else:
+                    player.start_auto_grapple(nearby_fulcrum["anchor"], nearby_fulcrum["target"])
+
+            if e_released and player.is_swinging:
+                player.release_swing()
 
             if player.should_spawn_projectile and not map_changed:
                 spawn_projectile(player, projectiles)
@@ -368,11 +378,15 @@ def main():
         if shop_active:
             shop.draw_shop_area(screen, camera)
 
-        # Grapple fulcrum marker (purple circle + box). The grapple still works;
-        # this only hides the visible debug-looking marker.
-        # for fulcrum in fulcrums:
-        #     pygame.draw.circle(screen, (150, 80, 230), camera.apply_pos(fulcrum["anchor"]), FULCRUM_RADIUS)
-        #     pygame.draw.rect(screen, (150, 80, 230), camera.apply_rect(fulcrum["rect"]), 1)
+        # MAP 2 grapple fulcrums: visible anchor points from Tiled.
+        if current_map.map_id == 2:
+            for fulcrum in fulcrums:
+                anchor_pos = camera.apply_pos(fulcrum["anchor"])
+                pygame.draw.circle(screen, (42, 28, 70), anchor_pos, 30)
+                pygame.draw.circle(screen, (110, 65, 170), anchor_pos, 22)
+                pygame.draw.circle(screen, (170, 95, 235), anchor_pos, 15)
+                pygame.draw.circle(screen, (235, 220, 255), anchor_pos, 6)
+                pygame.draw.circle(screen, (205, 160, 255), anchor_pos, 30, 2)
 
         for coin in coins:
             coin.draw(screen, camera)
@@ -434,15 +448,15 @@ def main():
             draw_popup(screen, "GAME OVER", "You were defeated.")
         elif game_state == "victory":
             draw_popup(screen, "PROTOTYPE COMPLETE", "You reached the final door.")
-
-         # Dev teleport overlay — drawn last so it sits on top of everything
-        dev_teleport.draw(screen)
-
         if PIXELATE_GAME:
             small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
             pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
             window.blit(pixel_surface, (0, 0))
+            # Draw dev tools after pixel scaling so F3 text stays readable.
+            dev_teleport.draw(window)
         else:
+            # Dev teleport overlay is drawn last so it sits on top of everything.
+            dev_teleport.draw(screen)
             window.blit(screen, (0, 0))
 
         pygame.display.flip()
@@ -784,23 +798,24 @@ def kill_player_instantly(player):
 
 
 def get_nearby_fulcrum(player, fulcrums):
-    if get_weapon(player.current_weapon_id)["id"] != "grapple_weapon":
-        return None
-
-    if player.is_auto_grappling:
+    if player.is_auto_grappling or getattr(player, "is_swinging", False):
         return None
 
     player_x, player_y = player.rect.center
 
     for fulcrum in fulcrums:
+        requires_grapple_weapon = fulcrum.get("requires_grapple_weapon", True)
+        if requires_grapple_weapon and get_weapon(player.current_weapon_id)["id"] != "grapple_weapon":
+            continue
+
         anchor_x, anchor_y = fulcrum["anchor"]
         distance = math.hypot(player_x - anchor_x, player_y - anchor_y)
 
-        if distance <= FULCRUM_INTERACT_DISTANCE:
+        interact_distance = fulcrum.get("interact_distance", FULCRUM_INTERACT_DISTANCE)
+        if distance <= interact_distance:
             return fulcrum
 
     return None
-
 
 def draw_interaction_text(screen, player, camera=None):
     font = pygame.font.Font(None, 30)
@@ -833,7 +848,8 @@ def draw_shop_interaction_text(screen, shop, camera=None):
 
 def draw_door_interaction_text(screen, door, camera=None):
     font = pygame.font.Font(None, 30)
-    text = font.render("Press E to enter", True, (220, 255, 220))
+    prompt = door.get("prompt", "Press E to enter")
+    text = font.render(prompt, True, (220, 255, 220))
     rect = door["rect"]
     pos = (rect.centerx, rect.top - 12)
     if camera:

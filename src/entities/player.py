@@ -1,3 +1,5 @@
+import math
+
 import pygame
 
 from settings import (
@@ -82,6 +84,12 @@ class Player:
         self.auto_grapple_control = None
         self.auto_grapple_anchor = None
 
+        self.is_swinging = False
+        self.swing_anchor = None
+        self.swing_radius = 0
+        self.swing_angle = 0
+        self.swing_angular_velocity = 0
+
         self.is_dashing = False
         self.dash_timer = 0
         self.dash_cooldown_timer = 0
@@ -104,7 +112,7 @@ class Player:
             self.vel_x = 0
             return
 
-        if self.is_auto_grappling:
+        if self.is_auto_grappling or self.is_swinging:
             self.vel_x = 0
             return
 
@@ -187,6 +195,7 @@ class Player:
             and self.skill_cooldown_timer <= 0
             and not self.is_dead
             and not self.is_auto_grappling
+            and not self.is_swinging
         )
 
     def spend_skill_cost(self, skill):
@@ -336,6 +345,7 @@ class Player:
         control_y = min(start_y, end_y) - AUTO_GRAPPLE_ARC_HEIGHT
         self.auto_grapple_control = (control_x, control_y)
 
+        self.cancel_swing()
         self.is_dashing = False
         self.is_attacking = False
         self.is_blocking = False
@@ -367,6 +377,129 @@ class Player:
             self.auto_grapple_control = None
             self.auto_grapple_anchor = None
 
+    def start_swing(self, anchor_pos):
+        anchor_x, anchor_y = anchor_pos
+        player_x, player_y = self.rect.center
+        dx = player_x - anchor_x
+        dy = player_y - anchor_y
+
+        # Fulcrums are ceiling hooks. Kael always hangs below the hook,
+        # but keeps enough side offset to start a real swinging arc.
+        if dy < 90:
+            dy = 135
+
+        if abs(dx) < 30:
+            dx = 90 * self.facing
+
+        dx = max(-280, min(280, dx))
+        radius = max(135, min(340, math.hypot(dx, dy)))
+
+        min_swing_angle = math.radians(15)
+        max_swing_angle = math.radians(165)
+
+        self.is_swinging = True
+        self.swing_anchor = anchor_pos
+        self.swing_radius = radius
+        self.swing_angle = math.atan2(dy, dx)
+        self.swing_angle = max(min_swing_angle, min(max_swing_angle, self.swing_angle))
+
+        self.swing_angular_velocity = self.vel_x / max(radius, 1)
+        if abs(self.swing_angular_velocity) < 0.03:
+            if self.swing_angle < math.pi / 2:
+                self.swing_angular_velocity = 0.045
+            elif self.swing_angle > math.pi / 2:
+                self.swing_angular_velocity = -0.045
+            else:
+                self.swing_angular_velocity = 0.045 * self.facing
+
+        center_x = anchor_x + math.cos(self.swing_angle) * self.swing_radius
+        center_y = anchor_y + math.sin(self.swing_angle) * self.swing_radius
+        self.rect.center = (round(center_x), round(center_y))
+
+        self.is_auto_grappling = False
+        self.is_dashing = False
+        self.is_attacking = False
+        self.is_blocking = False
+        self.is_parrying = False
+        self.vel_x = 0
+        self.vel_y = 0
+        self.on_ground = False
+
+    def update_swing(self, dt, keys):
+        if self.swing_anchor is None:
+            self.cancel_swing()
+            return
+
+        frame_scale = max(0.5, min(2.0, dt * 60))
+        min_swing_angle = math.radians(15)
+        max_swing_angle = math.radians(165)
+
+        # True below-hook pendulum motion. Straight down is pi / 2.
+        angle_from_bottom = self.swing_angle - math.pi / 2
+        self.swing_angular_velocity += -math.sin(angle_from_bottom) * 0.0062 * frame_scale
+
+        # Optional player pumping. A pushes toward the left side of the arc,
+        # D pushes toward the right side.
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+            self.swing_angular_velocity += 0.0024 * frame_scale
+            self.facing = -1
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            self.swing_angular_velocity -= 0.0024 * frame_scale
+            self.facing = 1
+
+        self.swing_angular_velocity *= 0.997
+        self.swing_angular_velocity = max(-0.115, min(0.115, self.swing_angular_velocity))
+        self.swing_angle += self.swing_angular_velocity * frame_scale
+
+        # Reflect at the top ends of the arc so the swing comes back naturally.
+        # This prevents full-circle loops without creating a frozen hard stop.
+        if self.swing_angle < min_swing_angle:
+            overshoot = min_swing_angle - self.swing_angle
+            self.swing_angle = min_swing_angle + overshoot
+            self.swing_angular_velocity = abs(self.swing_angular_velocity) * 0.88
+        elif self.swing_angle > max_swing_angle:
+            overshoot = self.swing_angle - max_swing_angle
+            self.swing_angle = max_swing_angle - overshoot
+            self.swing_angular_velocity = -abs(self.swing_angular_velocity) * 0.88
+
+        self.swing_angle = max(min_swing_angle, min(max_swing_angle, self.swing_angle))
+
+        anchor_x, anchor_y = self.swing_anchor
+        center_x = anchor_x + math.cos(self.swing_angle) * self.swing_radius
+        center_y = anchor_y + math.sin(self.swing_angle) * self.swing_radius
+        self.rect.center = (round(center_x), round(center_y))
+        self.vel_x = 0
+        self.vel_y = 0
+
+    def release_swing(self):
+        if not self.is_swinging or self.swing_anchor is None:
+            return
+
+        tangent_x = -math.sin(self.swing_angle)
+        tangent_y = math.cos(self.swing_angle)
+        launch_speed = self.swing_angular_velocity * self.swing_radius
+        launch_speed = max(-18, min(18, launch_speed))
+
+        self.vel_x = tangent_x * launch_speed
+        self.vel_y = tangent_y * launch_speed - 5
+
+        if abs(self.vel_x) < PLAYER_SPEED * 1.2:
+            self.vel_x = PLAYER_SPEED * 1.8 * self.facing
+        if self.vel_y > -4:
+            self.vel_y = -8
+
+        self.cancel_swing(keep_velocity=True)
+
+    def cancel_swing(self, keep_velocity=False):
+        self.is_swinging = False
+        self.swing_anchor = None
+        self.swing_radius = 0
+        self.swing_angle = 0
+        self.swing_angular_velocity = 0
+        if not keep_velocity:
+            self.vel_x = 0
+            self.vel_y = 0
+
     def update(self, dt, platforms, keys):
         self.update_timers(dt)
 
@@ -375,6 +508,10 @@ class Player:
 
         if self.is_dead:
             self.vel_x = 0
+            return
+
+        if self.is_swinging:
+            self.update_swing(dt, keys)
             return
 
         if self.is_auto_grappling:
@@ -450,12 +587,12 @@ class Player:
     def move_x(self, platforms):
         self.rect.x += self.vel_x
 
-        # for platform in platforms:
-        #     if self.rect.colliderect(platform):
-        #         if self.vel_x > 0:
-        #             self.rect.right = platform.left
-        #         elif self.vel_x < 0:
-        #             self.rect.left = platform.right
+        for platform in platforms:
+            if self.rect.colliderect(platform):
+                if self.vel_x > 0:
+                    self.rect.right = platform.left
+                elif self.vel_x < 0:
+                    self.rect.left = platform.right
 
     def move_y(self, platforms):
         self.rect.y += self.vel_y
@@ -498,6 +635,14 @@ class Player:
                 start_pos = camera.apply_pos(start_pos)
                 end_pos = camera.apply_pos(end_pos)
             pygame.draw.line(screen, (180, 90, 255), start_pos, end_pos, 3)
+
+        if self.is_swinging and self.swing_anchor is not None:
+            start_pos = self.swing_anchor
+            end_pos = self.rect.center
+            if camera:
+                start_pos = camera.apply_pos(start_pos)
+                end_pos = camera.apply_pos(end_pos)
+            pygame.draw.line(screen, (130, 210, 255), start_pos, end_pos, 2)
 
         if self.soul_anchor_active and self.soul_anchor_pos is not None:
             anchor_pos = self.soul_anchor_pos

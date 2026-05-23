@@ -2705,98 +2705,43 @@ def draw_map2_section_story_details(screen, camera, game_map):
             rect(sx, y + 82, 40, 5, (86, 58, 120))
             rect(sx + 18, y + 68, 5, 20, (116, 84, 170))
 
-    def experiment_altar(cx, floor_y):
-        def poly(points, color, width=0):
-            xs = [p[0] for p in points]
-            ys = [p[1] for p in points]
-            if visible(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)):
-                pygame.draw.polygon(screen, color, [apply_pos(p) for p in points], width)
+    def experiment_altar(cx, platform_y):
+        glow(cx, platform_y - 94, 430, 330, (132, 84, 255, 36))
+        circle((cx, platform_y - 160), 118, (38, 32, 62), 5)
+        circle((cx, platform_y - 160), 64, (85, 66, 134), 3)
+        circle((cx, platform_y - 160), 18, (224, 222, 255))
 
-        # One clear altar-chair silhouette: no tall side pillars or tank stacks.
-        glow(cx, floor_y - 165, 560, 390, (132, 84, 255, 42))
-        glow(cx - 18, floor_y - 218, 300, 250, (72, 196, 255, 26))
+        # The seat and altar base.
+        rect(cx - 92, platform_y - 132, 184, 102, (15, 14, 24))
+        border(cx - 92, platform_y - 132, 184, 102, (146, 112, 216), 3)
+        rect(cx - 58, platform_y - 165, 116, 58, (38, 36, 58))
+        border(cx - 58, platform_y - 165, 116, 58, (170, 150, 230), 2)
+        rect(cx - 44, platform_y - 126, 88, 34, (72, 66, 96))
+        rect(cx - 86, platform_y - 68, 172, 18, (80, 72, 104))
+        rect(cx - 110, platform_y - 42, 220, 18, (42, 34, 58))
+        border(cx - 110, platform_y - 42, 220, 18, (128, 98, 194), 2)
 
-        # Circular lunar machine behind the restraint chair.
-        circle((cx, floor_y - 230), 138, (18, 19, 34), 0)
-        circle((cx, floor_y - 230), 138, (116, 96, 172), 4)
-        circle((cx, floor_y - 230), 92, (44, 38, 72), 3)
-        circle((cx, floor_y - 230), 38, (104, 214, 255), 2)
-        circle((cx, floor_y - 230), 13, (225, 235, 255), 0)
-        rect(cx - 7, floor_y - 379, 14, 34, (80, 88, 120))
-        rect(cx - 30, floor_y - 350, 60, 8, (126, 116, 172))
+        # Arm clamps and head brace.
+        rect(cx - 118, platform_y - 116, 44, 14, (86, 94, 120))
+        rect(cx + 74, platform_y - 116, 44, 14, (86, 94, 120))
+        rect(cx - 16, platform_y - 190, 32, 34, (92, 94, 128))
+        rect(cx - 42, platform_y - 178, 84, 7, (126, 116, 172))
 
-        # Reclined experiment chair.
-        poly(
-            [
-                (cx - 88, floor_y - 278),
-                (cx + 50, floor_y - 250),
-                (cx + 30, floor_y - 118),
-                (cx - 118, floor_y - 145),
-            ],
-            (28, 27, 44),
-        )
-        poly(
-            [
-                (cx - 88, floor_y - 278),
-                (cx + 50, floor_y - 250),
-                (cx + 30, floor_y - 118),
-                (cx - 118, floor_y - 145),
-            ],
-            (174, 152, 224),
-            3,
-        )
-        poly(
-            [
-                (cx - 57, floor_y - 238),
-                (cx + 12, floor_y - 224),
-                (cx - 2, floor_y - 145),
-                (cx - 75, floor_y - 160),
-            ],
-            (74, 64, 104),
-        )
-        rect(cx - 136, floor_y - 116, 272, 48, (31, 28, 44))
-        border(cx - 136, floor_y - 116, 272, 48, (160, 132, 220), 3)
-        rect(cx - 170, floor_y - 70, 340, 28, (42, 34, 58))
-        border(cx - 170, floor_y - 70, 340, 28, (126, 96, 188), 2)
-        rect(cx - 116, floor_y - 42, 232, 24, (22, 20, 32))
-        rect(cx - 78, floor_y - 33, 156, 6, (88, 230, 255))
+        # Tubes/cables feeding the chair from tanks and ceiling.
+        for sx, sy in [(cx - 210, platform_y - 260), (cx - 150, platform_y - 225), (cx + 150, platform_y - 225), (cx + 220, platform_y - 270)]:
+            line((sx, sy), (cx - 62 if sx < cx else cx + 62, platform_y - 125), (76, 58, 122), 4)
+            line((sx + 8, sy + 10), (cx - 36 if sx < cx else cx + 36, platform_y - 94), (50, 220, 235), 2)
+        for sx in [cx - 76, cx - 28, cx + 28, cx + 76]:
+            line((sx, 108), (sx, platform_y - 174), (52, 42, 82), 4)
+            rect(sx - 7, platform_y - 182, 14, 10, (130, 110, 188))
 
-        # Head ring and body restraints.
-        circle((cx - 50, floor_y - 260), 28, (23, 25, 38), 0)
-        circle((cx - 50, floor_y - 260), 28, (188, 172, 236), 3)
-        rect(cx - 87, floor_y - 264, 74, 8, (134, 124, 174))
-        rect(cx - 136, floor_y - 136, 58, 12, (104, 114, 142))
-        rect(cx + 78, floor_y - 136, 58, 12, (104, 114, 142))
-        rect(cx - 128, floor_y - 88, 52, 10, (104, 114, 142))
-        rect(cx + 76, floor_y - 88, 52, 10, (104, 114, 142))
-        rect(cx - 145, floor_y - 130, 8, 56, (74, 86, 112))
-        rect(cx + 137, floor_y - 130, 8, 56, (74, 86, 112))
-
-        # Tubes and monitor arms feeding the chair, drawn diagonally so they do not read as pillars.
-        tube_paths = [
-            ((cx - 315, floor_y - 276), (cx - 106, floor_y - 194), (76, 58, 122), 5),
-            ((cx - 286, floor_y - 88), (cx - 83, floor_y - 108), (52, 220, 235), 3),
-            ((cx + 318, floor_y - 270), (cx + 94, floor_y - 190), (76, 58, 122), 5),
-            ((cx + 280, floor_y - 74), (cx + 86, floor_y - 105), (52, 220, 235), 3),
-            ((cx - 10, floor_y - 388), (cx - 45, floor_y - 285), (112, 92, 180), 4),
-        ]
-        for start, end, color, width in tube_paths:
-            line(start, end, color, width)
-            circle(start, 6, color, 0)
-            circle(end, 5, color, 0)
-
-        # Low machinery beside the chair. These stay below the altar line, not as pillars.
-        rect(cx - 332, floor_y - 106, 92, 54, (10, 16, 28))
-        border(cx - 332, floor_y - 106, 92, 54, (76, 88, 124), 2)
-        rect(cx - 318, floor_y - 92, 50, 8, (92, 230, 255))
-        rect(cx - 318, floor_y - 72, 30, 7, (146, 104, 255))
-        rect(cx + 238, floor_y - 108, 102, 58, (10, 16, 28))
-        border(cx + 238, floor_y - 108, 102, 58, (76, 88, 124), 2)
-        rect(cx + 256, floor_y - 92, 54, 8, (92, 230, 255))
-        rect(cx + 256, floor_y - 72, 36, 7, (146, 104, 255))
-        for sx in [cx - 114, cx + 114]:
-            line((sx, floor_y - 68), (sx, floor_y - 22), (58, 66, 90), 4)
-            rect(sx - 18, floor_y - 22, 36, 8, (82, 94, 120))
+        # Side apparatus.
+        for x in [cx - 260, cx + 170]:
+            rect(x, platform_y - 220, 92, 190, (8, 14, 26))
+            border(x, platform_y - 220, 92, 190, (94, 86, 142), 2)
+            rect(x + 18, platform_y - 185, 56, 112, (46, 35, 92))
+            rect(x + 25, platform_y - 176, 42, 8, (120, 92, 255))
+            rect(x + 25, platform_y - 62, 42, 6, (65, 230, 230))
 
     # Section dividers only: visual architecture, no text.
     for x in [1050, 2100, 3300, 4600, 5600, 6700, 7900, 9100, 10300]:
@@ -2940,46 +2885,21 @@ def draw_map2_section_story_details(screen, camera, game_map):
     border(9480, 1160, 530, 42, (116, 122, 190), 2)
 
     # Experiment core.
-    glow(10940, 610, 620, 650, (132, 84, 255, 34))
+    glow(10940, 610, 560, 620, (132, 84, 255, 35))
     rect(10430, 300, 630, 440, (9, 13, 25))
     border(10430, 300, 630, 440, (102, 82, 150), 3)
-
-    # Broken containment remains, kept low so they do not look like pillars.
-    rect(10488, 458, 210, 74, (10, 18, 30))
-    border(10488, 458, 210, 74, (80, 88, 120), 2)
-    rect(10512, 474, 146, 12, (72, 220, 245))
-    rect(10526, 506, 102, 8, (118, 90, 245))
-    line((10644, 458), (10682, 424), (160, 190, 220), 2)
-    line((10682, 424), (10706, 452), (160, 190, 220), 2)
-
-    experiment_altar(10845, 560)
-
-    # Wall conduits and signal beams feeding the altar.
-    for start, end, color, width in [
-        ((10482, 368), (10708, 430), (54, 44, 86), 4),
-        ((10496, 642), (10732, 506), (42, 70, 98), 3),
-        ((11194, 366), (10962, 430), (54, 44, 86), 4),
-        ((11238, 636), (10964, 504), (42, 70, 98), 3),
-        ((10844, 304), (10844, 380), (108, 92, 174), 3),
-    ]:
-        line(start, end, color, width)
-        circle(start, 5, color, 0)
-
-    # Small consoles, warning beacons, and observation glass.
-    for x, y in [(10688, 604), (11078, 610)]:
+    glass_tank(10510, 360, 150, 270, liquid=(118, 90, 245), broken=True, body=False)
+    experiment_altar(10845, 322)
+    for x in [10600, 10830, 11030, 11230]:
+        hanging_cable(x, 135, 230, (48, 42, 72))
+    for x, y in [(10690, 392), (10930, 410), (11150, 492)]:
         console(x, y, (146, 104, 255))
     rect(10935, 690, 160, 34, (42, 18, 34))
     rect(10980, 676, 62, 8, (218, 74, 115))
-    for x, y, color in [(10578, 384, (92, 230, 255)), (11186, 390, (255, 80, 95)), (11092, 502, (138, 104, 255))]:
-        glow(x, y, 86, 70, color + (32,))
-        rect(x - 20, y - 6, 40, 12, color)
-        rect(x - 5, y + 10, 10, 18, (52, 60, 82))
-    rect(11264, 332, 112, 258, (8, 14, 26))
-    border(11264, 332, 112, 258, (114, 96, 172), 3)
-    rect(11286, 356, 68, 178, (34, 26, 70))
-    rect(11298, 378, 44, 120, (118, 90, 245))
-    glow(11320, 448, 170, 330, (132, 84, 255, 28))
-
+    for x in [10820, 11060, 11310]:
+        rect(x, 210, 14, 82, (48, 56, 80))
+        rect(x - 10, 198, 34, 12, (94, 240, 180))
+        glow(x + 7, 202, 96, 70, (82, 240, 170, 32))
 
 class LevelManager:
     def __init__(self):

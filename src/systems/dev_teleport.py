@@ -5,25 +5,36 @@ class DevTeleport:
     """
     Developer-only teleport panel.
     - Press F3 to toggle the overlay
-    - While open: press 1-9 / 0 for MAP 0 sections
-    - Press Q for MAP 1 checkpoint, W for MAP 2
-    - Or click any button in the panel
+    - While open, press the shown key or click a button
     - ESC closes the panel
     """
 
     TARGETS = [
-        {"id": 1, "key": "1", "key_code": pygame.K_1, "map_id": 0, "name": "Body Pile", "pos": (100, 650)},
-        {"id": 2, "key": "2", "key_code": pygame.K_2, "map_id": 0, "name": "Destroyed Street", "pos": (1150, 650)},
-        {"id": 3, "key": "3", "key_code": pygame.K_3, "map_id": 0, "name": "Ruined Building", "pos": (2450, 650)},
-        {"id": 4, "key": "4", "key_code": pygame.K_4, "map_id": 0, "name": "Tram Wreck", "pos": (3950, 650)},
-        {"id": 5, "key": "5", "key_code": pygame.K_5, "map_id": 0, "name": "Science District", "pos": (5150, 650)},
-        {"id": 6, "key": "6", "key_code": pygame.K_6, "map_id": 0, "name": "Combat Courtyard", "pos": (6450, 650)},
-        {"id": 7, "key": "7", "key_code": pygame.K_7, "map_id": 0, "name": "Lab Entrance", "pos": (7650, 650)},
-        {"id": 8, "key": "8", "key_code": pygame.K_8, "map_id": 0, "name": "SHOP Area", "pos": (8550, 650)},
-        {"id": 9, "key": "9", "key_code": pygame.K_9, "map_id": 0, "name": "Collapsed City", "pos": (9350, 650)},
-        {"id": 10, "key": "0", "key_code": pygame.K_0, "map_id": 0, "name": "Boss Entrance", "pos": (10550, 650)},
-        {"id": 11, "key": "Q", "key_code": pygame.K_q, "map_id": 1, "name": "Checkpoint Map", "pos": (600, 604)},
-        {"id": 12, "key": "W", "key_code": pygame.K_w, "map_id": 2, "name": "Level 2 / Map 2", "pos": (100, 650)},
+        {"id": 1, "key": "1", "key_code": pygame.K_1, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Body Pile", "pos": (100, 650)},
+        {"id": 2, "key": "2", "key_code": pygame.K_2, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Destroyed Street", "pos": (1150, 650)},
+        {"id": 3, "key": "3", "key_code": pygame.K_3, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Ruined Building", "pos": (2450, 650)},
+        {"id": 4, "key": "4", "key_code": pygame.K_4, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Tram Wreck", "pos": (3950, 650)},
+        {"id": 5, "key": "5", "key_code": pygame.K_5, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Science District", "pos": (5150, 650)},
+        {"id": 6, "key": "6", "key_code": pygame.K_6, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Combat Courtyard", "pos": (6450, 650)},
+        {"id": 7, "key": "7", "key_code": pygame.K_7, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Lab Entrance", "pos": (7650, 650)},
+        {"id": 8, "key": "8", "key_code": pygame.K_8, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Shop Area", "pos": (8550, 650)},
+        {"id": 9, "key": "9", "key_code": pygame.K_9, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Collapsed City", "pos": (9350, 650)},
+        {"id": 10, "key": "0", "key_code": pygame.K_0, "map_id": 0, "group": "LEVEL 1 / MAP 0", "name": "Boss Entrance", "pos": (10550, 650)},
+
+        {"id": 11, "key": "Q", "key_code": pygame.K_q, "map_id": 1, "group": "CHECKPOINTS", "name": "Lower Sanctuary", "pos": (600, 604)},
+        {"id": 12, "key": "C", "key_code": pygame.K_c, "map_id": 3, "group": "CHECKPOINTS", "name": "Pale Crown Rail Station", "pos": (165, 650)},
+
+        {"id": 13, "key": "W", "key_code": pygame.K_w, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Upper Facility Entrance", "pos": (220, 337)},
+        {"id": 14, "key": "E", "key_code": pygame.K_e, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Broken Catwalk Zone", "pos": (760, 420)},
+        {"id": 15, "key": "R", "key_code": pygame.K_r, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Glass Chamber Labs", "pos": (1490, 643)},
+        {"id": 16, "key": "T", "key_code": pygame.K_t, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Reactor Shaft", "pos": (2400, 474)},
+        {"id": 17, "key": "Y", "key_code": pygame.K_y, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Security Lockdown", "pos": (3420, 310)},
+        {"id": 18, "key": "U", "key_code": pygame.K_u, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Flooded Research Sector", "pos": (4550, 338)},
+        {"id": 19, "key": "I", "key_code": pygame.K_i, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Memory Archive", "pos": (6150, 339)},
+        {"id": 20, "key": "O", "key_code": pygame.K_o, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Core Transit Rails", "pos": (7400, 394)},
+        {"id": 21, "key": "P", "key_code": pygame.K_p, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Quiet Descent", "pos": (8500, 482)},
+        {"id": 22, "key": "A", "key_code": pygame.K_a, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Experiment Chamber", "pos": (9750, 336)},
+        {"id": 23, "key": "S", "key_code": pygame.K_s, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Checkpoint Gate", "pos": (10930, 314)},
     ]
 
     def __init__(self):
@@ -40,7 +51,6 @@ class DevTeleport:
         self.hover_index = None
 
     def handle_key(self, key):
-        """Returns target id if a teleport key was pressed, else None."""
         if not self.visible:
             return None
 
@@ -50,7 +60,6 @@ class DevTeleport:
         return None
 
     def handle_click(self, mouse_pos):
-        """Returns target id if a button was clicked, else None."""
         if not self.visible:
             return None
 
@@ -76,7 +85,6 @@ class DevTeleport:
                 return target.copy()
         return None
 
-    # Backward-compatible helper for older code paths.
     def get_position(self, target_id):
         target = self.get_target(target_id)
         if target is None:
@@ -90,46 +98,60 @@ class DevTeleport:
         screen_w, screen_h = screen.get_size()
 
         overlay = pygame.Surface((screen_w, screen_h), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
+        overlay.fill((0, 0, 0, 172))
         screen.blit(overlay, (0, 0))
 
-        panel_w, panel_h = 520, min(screen_h - 40, 600)
+        panel_w = min(screen_w - 48, 1120)
+        panel_h = min(screen_h - 36, 650)
         panel = pygame.Rect(0, 0, panel_w, panel_h)
         panel.center = (screen_w // 2, screen_h // 2)
-        pygame.draw.rect(screen, (22, 28, 42), panel)
-        pygame.draw.rect(screen, (140, 200, 250), panel, 3)
+        pygame.draw.rect(screen, (16, 22, 34), panel)
+        pygame.draw.rect(screen, (130, 205, 245), panel, 3)
 
-        title_font = pygame.font.Font(None, 36)
-        title = title_font.render("DEV TELEPORT", True, (180, 220, 255))
-        screen.blit(title, title.get_rect(midtop=(panel.centerx, panel.y + 16)))
+        title_font = pygame.font.SysFont("consolas", 28, bold=True)
+        sub_font = pygame.font.SysFont("consolas", 17)
+        header_font = pygame.font.SysFont("consolas", 18, bold=True)
+        btn_font = pygame.font.SysFont("consolas", 16, bold=True)
 
-        sub_font = pygame.font.Font(None, 20)
-        sub = sub_font.render("1-9/0 = MAP 0, Q = MAP 1, W = MAP 2, ESC = close", True, (160, 170, 200))
-        screen.blit(sub, sub.get_rect(midtop=(panel.centerx, panel.y + 50)))
+        title = title_font.render("DEV TELEPORT", True, (205, 236, 255))
+        screen.blit(title, title.get_rect(midtop=(panel.centerx, panel.y + 14)))
+
+        sub = sub_font.render("F3 close/open | ESC close | click or press shown key", True, (165, 182, 210))
+        screen.blit(sub, sub.get_rect(midtop=(panel.centerx, panel.y + 47)))
 
         self.button_rects.clear()
-        btn_font = pygame.font.Font(None, 23)
-        btn_w, btn_h = 460, 32
-        gap = 5
-        y = panel.y + 84
+        col_gap = 28
+        col_w = (panel_w - 62 - col_gap) // 2
+        left_x = panel.x + 28
+        right_x = left_x + col_w + col_gap
+        start_y = panel.y + 86
 
-        for target in self.TARGETS:
-            btn = pygame.Rect(0, 0, btn_w, btn_h)
-            btn.midtop = (panel.centerx, y)
+        left_targets = [target for target in self.TARGETS if target["map_id"] != 2]
+        right_targets = [target for target in self.TARGETS if target["map_id"] == 2]
 
+        self._draw_column(screen, left_targets, left_x, start_y, col_w, "LEVEL 1 + CHECKPOINTS", header_font, btn_font)
+        self._draw_column(screen, right_targets, right_x, start_y, col_w, "LEVEL 2 SECTIONS", header_font, btn_font)
+
+    def _draw_column(self, screen, targets, x, y, width, title, header_font, btn_font):
+        title_text = header_font.render(title, True, (136, 226, 255))
+        screen.blit(title_text, (x, y))
+        y += 28
+
+        btn_h = 30
+        gap = 6
+
+        for target in targets:
+            btn = pygame.Rect(x, y, width, btn_h)
             is_hover = self.hover_index == target["id"]
-            bg_color = (60, 100, 140) if is_hover else (40, 55, 80)
-            border_color = (180, 230, 255) if is_hover else (110, 160, 210)
+            bg_color = (56, 88, 124) if is_hover else (33, 45, 68)
+            border_color = (195, 235, 255) if is_hover else (91, 137, 177)
 
             pygame.draw.rect(screen, bg_color, btn)
             pygame.draw.rect(screen, border_color, btn, 1)
 
-            label = btn_font.render(
-                f"[{target['key']}]  MAP {target['map_id']}  -  {target['name']}",
-                True,
-                (235, 245, 255),
-            )
-            screen.blit(label, label.get_rect(midleft=(btn.x + 18, btn.centery)))
+            label = f"[{target['key']}] MAP {target['map_id']} - {target['name']}"
+            text = btn_font.render(label, True, (240, 248, 255))
+            screen.blit(text, text.get_rect(midleft=(btn.x + 12, btn.centery)))
 
             self.button_rects.append((target["id"], btn))
             y += btn_h + gap

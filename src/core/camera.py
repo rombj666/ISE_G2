@@ -16,21 +16,27 @@ class Camera:
         self.map_width = map_width
         self.map_height = map_height
         self.x = self.clamp_x(self.x)
-        self.y = 0
+        self.y = self.clamp_y(self.y)
 
     def update(self, target_rect):
         target_x = target_rect.centerx - self.screen_width / 2
+        target_y = target_rect.centery - self.screen_height / 2
         target_x = self.clamp_x(target_x)
+        target_y = self.clamp_y(target_y)
         self.x += (target_x - self.x) * CAMERA_SMOOTHING
-        self.y = 0
+        self.y += (target_y - self.y) * CAMERA_SMOOTHING
 
     def clamp_x(self, value):
         max_x = max(0, self.map_width - self.screen_width)
         return max(0, min(value, max_x))
 
+    def clamp_y(self, value):
+        max_y = max(0, self.map_height - self.screen_height)
+        return max(0, min(value, max_y))
+
     def snap_to(self, target_rect):
         self.x = self.clamp_x(target_rect.centerx - self.screen_width / 2)
-        self.y = 0
+        self.y = self.clamp_y(target_rect.centery - self.screen_height / 2)
 
     def apply_rect(self, rect):
         return pygame.Rect(

@@ -211,33 +211,45 @@ class Shop:
         pygame.draw.rect(screen, (170, 120, 70), counter)
         pygame.draw.rect(screen, (245, 220, 140), cabinet, 3)
 
-        font = pygame.font.Font(None, 22)
-        title = font.render("SHOP", True, (255, 245, 180))
+        title_font = pygame.font.Font(None, 30)
+        title = title_font.render("SHOP", True, (255, 245, 180))
         screen.blit(title, title.get_rect(center=cabinet.center))
 
-        slot_width = 92
-        slot_height = 28
-        gap = 8
+        slot_width = 118
+        slot_height = 34
+        gap = 10
         total_width = len(self.current_products) * slot_width + (len(self.current_products) - 1) * gap
         start_x = self.rect.centerx - total_width // 2
-        slot_y = self.rect.y - slot_height - 12
+        slot_y = self.rect.y - slot_height - 18
 
         for index, product in enumerate(self.current_products):
             slot_rect = pygame.Rect(start_x + index * (slot_width + gap), slot_y, slot_width, slot_height)
             if camera:
                 slot_rect = camera.apply_rect(slot_rect)
 
-            pygame.draw.rect(screen, (38, 44, 54), slot_rect)
-            pygame.draw.rect(screen, (220, 210, 120), slot_rect, 2)
+            pygame.draw.rect(screen, (22, 29, 42), slot_rect)
+            pygame.draw.rect(screen, (245, 230, 130), slot_rect, 2)
             label = self.get_short_product_name(product)
-            text = font.render(label, True, (245, 245, 245))
+
+            text = None
+            for font_size in (25, 23, 21, 19):
+                slot_font = pygame.font.Font(None, font_size)
+                candidate = slot_font.render(label, True, (255, 255, 255))
+                if candidate.get_width() <= slot_rect.width - 10:
+                    text = candidate
+                    break
+
+            if text is None:
+                slot_font = pygame.font.Font(None, 19)
+                text = slot_font.render(label, True, (255, 255, 255))
+
             screen.blit(text, text.get_rect(center=slot_rect.center))
 
     def get_short_product_name(self, product):
         short_names = {
             "Light Weapon": "Light",
             "Heavy Weapon": "Heavy",
-            "Shooter Weapon": "Shoot",
+            "Shooter Weapon": "Shooter",
             "Shield Weapon": "Shield",
             "Grapple Weapon": "Grapple",
             "Time Freeze": "Freeze",
@@ -245,8 +257,13 @@ class Shop:
             "Energy Beam": "Beam",
             "Execute Strike": "Execute",
             "Soul Anchor": "Anchor",
+            "Heal HP": "Heal",
             "Restore Mana": "Mana",
-            "Attack Potion +10%": "Potion",
+            "Max HP +20": "Max HP",
+            "Max Mana +20": "Max Mana",
+            "Crit Chance +5%": "Crit %",
+            "Crit Damage +25%": "Crit Dmg",
+            "Attack Potion +10%": "Atk Up",
         }
         return short_names.get(product["name"], product["name"])
 

@@ -87,6 +87,7 @@ def load_tiled_map(path):
 
     spawns = _load_spawns(layers)
     doors = _load_doors(layers)
+    fulcrums = _load_fulcrums(layers)
     checkpoints = _load_named_rects(layers, "checkpoints")
     interactables = _load_named_rects(layers, "interactables")
     hazards = _load_named_rects(layers, "hazards")
@@ -107,6 +108,7 @@ def load_tiled_map(path):
         "enemy_spawns": spawns.get("enemy_spawns", []),
         "boss_spawn": spawns.get("boss_spawn"),
         "doors": doors,
+        "fulcrums": fulcrums,
         "checkpoints": checkpoints,
         "interactables": interactables,
         "hazards": hazards,
@@ -176,12 +178,19 @@ def _load_moving_platforms(layers):
 
 def _load_spawns(layers):
     result = {"enemy_spawns": []}
-    for obj in _layer_objects(layers, "spawns"):
+    objects = list(_layer_objects(layers, "spawns"))
+
+    # Temporary friendliness for your current MAP 2 export:
+    # the player spawn rectangle is in player_guide and named "Spawns".
+    if not objects:
+        objects.extend(_layer_objects(layers, "player_guide"))
+
+    for obj in objects:
         props = _properties(obj)
         name = str(obj.get("name") or props.get("name") or "").lower()
         point = _spawn_point(obj)
 
-        if name == "player_spawn":
+        if name in ("player_spawn", "spawn", "spawns", "kael_spawn", "start"):
             result["player_spawn"] = point
         elif name == "boss_spawn":
             result["boss_spawn"] = point
@@ -209,6 +218,37 @@ def _load_doors(layers):
             }
         )
     return doors
+
+
+def _load_fulcrums(layers):
+    fulcrums = []
+    for obj in _layer_objects(layers, "fulcrums"):
+        rect = _rect(obj)
+        if rect.width <= 0 or rect.height <= 0:
+            continue
+
+        props = _properties(obj)
+        anchor = (
+            int(round(_float(props.get("anchor_x"), rect.centerx))),
+            int(round(_float(props.get("anchor_y"), rect.centery))),
+        )
+        target = (
+            int(round(_float(props.get("target_x"), anchor[0]))),
+            int(round(_float(props.get("target_y"), anchor[1]))),
+        )
+
+        fulcrums.append(
+            {
+                "rect": rect,
+                "anchor": anchor,
+                "target": target,
+                "used": False,
+                "name": obj.get("name", ""),
+                "interact_distance": _float(props.get("interact_distance"), 180),
+                "requires_grapple_weapon": _bool(props.get("requires_grapple_weapon"), False),
+            }
+        )
+    return fulcrums
 
 
 def _load_named_rects(layers, layer_name):
