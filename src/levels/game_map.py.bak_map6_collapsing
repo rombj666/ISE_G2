@@ -17,7 +17,6 @@ class GameMap:
         checkpoints=None,
         interactables=None,
         hazards=None,
-        collapsing_platforms=None,
         map_type="normal_stage",
     ):
         self.map_id = map_id
@@ -36,5 +35,4 @@ class GameMap:
         self.checkpoints = checkpoints or []
         self.interactables = interactables or []
         self.hazards = hazards or []
-        self.collapsing_platforms = collapsing_platforms or []
         self.map_type = map_type

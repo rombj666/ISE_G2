@@ -4,80 +4,6 @@ from pathlib import Path
 import pygame
 
 
-
-class CollapsingPlatform:
-    """Temporary military platform loaded from Tiled's CollapsingPlatforms layer."""
-
-    def __init__(
-        self,
-        rect,
-        name="",
-        warning_time=0.6,
-        rebuild_delay=3.0,
-        collapse_mode="vanish",
-        shake_px=3,
-    ):
-        self.rect = rect
-        self.home_rect = rect.copy()
-        self.name = name
-        self.warning_time = max(0.05, float(warning_time))
-        self.rebuild_delay = max(0.1, float(rebuild_delay))
-        self.collapse_mode = str(collapse_mode or "vanish").strip().lower()
-        self.shake_px = int(round(float(shake_px)))
-        self.state = "stable"
-        self.timer = 0.0
-
-    @property
-    def is_solid(self):
-        return self.state in ("stable", "warning")
-
-    @property
-    def warning_progress(self):
-        if self.state != "warning":
-            return 0.0
-        return min(1.0, self.timer / self.warning_time)
-
-    @property
-    def rebuild_progress(self):
-        if self.state != "collapsed":
-            return 1.0
-        return min(1.0, self.timer / self.rebuild_delay)
-
-    def reset(self):
-        self.rect.x = self.home_rect.x
-        self.rect.y = self.home_rect.y
-        self.rect.width = self.home_rect.width
-        self.rect.height = self.home_rect.height
-        self.state = "stable"
-        self.timer = 0.0
-
-    def player_is_on_top(self, player):
-        horizontal_overlap = (
-            player.rect.right > self.rect.left + 4
-            and player.rect.left < self.rect.right - 4
-        )
-        vertical_contact = self.rect.top - 12 <= player.rect.bottom <= self.rect.top + 16
-        return horizontal_overlap and vertical_contact and player.vel_y >= -1
-
-    def update(self, dt, player):
-        if self.state == "stable":
-            if self.player_is_on_top(player):
-                self.state = "warning"
-                self.timer = 0.0
-            return
-
-        self.timer += dt
-
-        if self.state == "warning":
-            if self.timer >= self.warning_time:
-                self.state = "collapsed"
-                self.timer = 0.0
-            return
-
-        if self.state == "collapsed" and self.timer >= self.rebuild_delay:
-            self.reset()
-
-
 class MovingPlatform:
     HORIZONTAL_TYPES = {"horizontal", "left_right", "leftright", "x", "patrol_x"}
     VERTICAL_TYPES = {"vertical", "up_down", "updown", "y", "patrol_y"}
@@ -95,13 +21,6 @@ class MovingPlatform:
         auto_start=False,
         reverse_on_collision=True,
         start_direction=None,
-        collision_behavior=None,
-        loop_reset_to="start",
-        loop_area=False,
-        loop_min_x=None,
-        loop_max_x=None,
-        loop_min_y=None,
-        loop_max_y=None,
     ):
         self.rect = rect
         self.name = name
@@ -112,16 +31,7 @@ class MovingPlatform:
         self.current_x = float(rect.x)
         self.current_y = float(rect.y)
         self.auto_start = bool(auto_start)
-        self.start_direction_value = start_direction
         self.reverse_on_collision = bool(reverse_on_collision)
-        self.collision_behavior = self._collision_behavior(collision_behavior, self.reverse_on_collision)
-        self.loop_reset_to = str(loop_reset_to or "start").strip().lower()
-        self.loop_area = bool(loop_area)
-        self.loop_min_x = self._optional_float(loop_min_x)
-        self.loop_max_x = self._optional_float(loop_max_x)
-        self.loop_min_y = self._optional_float(loop_min_y)
-        self.loop_max_y = self._optional_float(loop_max_y)
-        self.looped_this_frame = False
         self.active = not self.auto_start
         self.arrived = False
 
@@ -164,14 +74,6 @@ class MovingPlatform:
         except (TypeError, ValueError):
             return float(default)
 
-    def _optional_float(self, value):
-        if value in (None, ""):
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
     def _direction_value(self, value):
         text = str(value).strip().lower()
         if text in ("left", "up", "-1", "negative", "backward"):
@@ -183,16 +85,6 @@ class MovingPlatform:
         except (TypeError, ValueError):
             return 1
 
-    def _collision_behavior(self, collision_behavior, reverse_on_collision):
-        text = str(collision_behavior or "").strip().lower().replace("-", "_").replace(" ", "_")
-        if text in ("loop", "wrap", "repeat", "restart", "reset", "loop_on_collision", "wrap_on_collision"):
-            return "loop"
-        if text in ("ignore", "none", "off", "pass", "pass_through"):
-            return "ignore"
-        if text in ("reverse", "bounce", "ping_pong", "pingpong"):
-            return "reverse"
-        return "reverse" if reverse_on_collision else "ignore"
-
     def reset(self):
         self.rect.x = self.start_x
         self.rect.y = self.start_y
@@ -200,21 +92,17 @@ class MovingPlatform:
         self.current_y = float(self.start_y)
         self.active = not self.auto_start
         self.arrived = False
-        self.looped_this_frame = False
-        if self.start_direction_value is not None:
-            self.direction = self._direction_value(self.start_direction_value)
-        else:
-            target = self.end_x if self.axis == "x" else self.end_y
-            start = self.start_x if self.axis == "x" else self.start_y
-            self.direction = 1 if self.unbounded or target >= start else -1
+        target = self.end_x if self.axis == "x" else self.end_y
+        start = self.start_x if self.axis == "x" else self.start_y
+        self.direction = 1 if self.unbounded or target >= start else -1
 
     def player_is_on_top(self, player):
         horizontal_overlap = (
             player.rect.right > self.rect.left + 4
             and player.rect.left < self.rect.right - 4
         )
-        vertical_contact = self.rect.top - 12 <= player.rect.bottom <= self.rect.top + 16
-        return horizontal_overlap and vertical_contact and player.vel_y >= -1
+        vertical_contact = abs(player.rect.bottom - self.rect.top) <= 8
+        return horizontal_overlap and vertical_contact and player.vel_y >= 0
 
     def update(self, dt, player, solid_rects=None):
         if self.arrived or self.speed <= 0:
@@ -231,11 +119,8 @@ class MovingPlatform:
 
         old_x = self.rect.x
         old_y = self.rect.y
-        self.looped_this_frame = False
 
-        if self.loop_area:
-            self._update_loop_area(dt)
-        elif self.one_way:
+        if self.one_way:
             self._update_one_way(dt, solid_rects)
         else:
             self._update_ping_pong(dt, solid_rects)
@@ -243,38 +128,11 @@ class MovingPlatform:
         delta_x = self.rect.x - old_x
         delta_y = self.rect.y - old_y
 
-        if player_on_platform and not self.looped_this_frame and (delta_x != 0 or delta_y != 0):
+        if player_on_platform and (delta_x != 0 or delta_y != 0):
             player.rect.x += delta_x
             player.rect.y += delta_y
             player.vel_y = 0
             player.on_ground = True
-
-    def _update_loop_area(self, dt):
-        current = self.current_x if self.axis == "x" else self.current_y
-        next_value = current + self.direction * self.speed * dt
-
-        if self.axis == "x":
-            min_bound = self.loop_min_x if self.loop_min_x is not None else self.start_x
-            max_bound = self.loop_max_x if self.loop_max_x is not None else self.start_x
-            size = self.rect.width
-        else:
-            min_bound = self.loop_min_y if self.loop_min_y is not None else self.start_y
-            max_bound = self.loop_max_y if self.loop_max_y is not None else self.start_y
-            size = self.rect.height
-
-        if self.direction > 0 and next_value > max_bound:
-            next_value = min_bound
-            self.looped_this_frame = True
-        elif self.direction < 0 and next_value + size < min_bound:
-            next_value = max_bound - size
-            self.looped_this_frame = True
-
-        if self.axis == "x":
-            self.current_x = next_value
-            self.rect.x = int(round(next_value))
-        else:
-            self.current_y = next_value
-            self.rect.y = int(round(next_value))
 
     def _update_one_way(self, dt, solid_rects):
         target = self.end_x if self.axis == "x" else self.end_y
@@ -297,11 +155,8 @@ class MovingPlatform:
         if self.unbounded:
             current = self.current_x if self.axis == "x" else self.current_y
             next_value = current + self.direction * self.speed * dt
-            if not self._try_set_axis(next_value, solid_rects):
-                if self.collision_behavior == "loop":
-                    self._loop_to_start()
-                elif self.collision_behavior == "reverse":
-                    self.direction *= -1
+            if not self._try_set_axis(next_value, solid_rects) and self.reverse_on_collision:
+                self.direction *= -1
             return
 
         start = self.start_x if self.axis == "x" else self.start_y
@@ -322,13 +177,8 @@ class MovingPlatform:
 
         if self._try_set_axis(next_value, solid_rects):
             if hit_endpoint:
-                if self.collision_behavior == "loop":
-                    self._loop_to_start()
-                else:
-                    self.direction *= -1
-        elif self.collision_behavior == "loop":
-            self._loop_to_start()
-        elif self.collision_behavior == "reverse":
+                self.direction *= -1
+        elif self.reverse_on_collision:
             self.direction *= -1
 
     def _try_set_axis(self, next_value, solid_rects):
@@ -343,7 +193,7 @@ class MovingPlatform:
         test_rect.x = int(round(next_x))
         test_rect.y = int(round(next_y))
 
-        if self.collision_behavior in ("reverse", "loop"):
+        if self.reverse_on_collision:
             for solid in solid_rects:
                 if solid is self.rect:
                     continue
@@ -355,13 +205,6 @@ class MovingPlatform:
         self.rect.x = test_rect.x
         self.rect.y = test_rect.y
         return True
-
-    def _loop_to_start(self):
-        self.current_x = float(self.start_x)
-        self.current_y = float(self.start_y)
-        self.rect.x = int(round(self.current_x))
-        self.rect.y = int(round(self.current_y))
-        self.looped_this_frame = True
 
 
 def load_tiled_map(path):
@@ -381,7 +224,6 @@ def load_tiled_map(path):
     platforms = list(collision_platforms)
     moving_platforms = _load_moving_platforms(layers)
     platforms.extend(platform.rect for platform in moving_platforms)
-    collapsing_platforms = _load_collapsing_platforms(layers)
 
     spawns = _load_spawns(layers)
     doors = _load_doors(layers)
@@ -403,7 +245,6 @@ def load_tiled_map(path):
         "platforms": platforms,
         "collision_platforms": collision_platforms,
         "moving_platforms": moving_platforms,
-        "collapsing_platforms": collapsing_platforms,
         "player_spawn": spawns.get("player_spawn"),
         "enemy_spawns": spawns.get("enemy_spawns", []),
         "boss_spawn": spawns.get("boss_spawn"),
@@ -484,55 +325,9 @@ def _load_moving_platforms(layers):
                 auto_start=_bool(props.get("auto_start"), False),
                 reverse_on_collision=_bool(props.get("reverse_on_collision"), True),
                 start_direction=props.get("start_direction"),
-                collision_behavior=_moving_collision_behavior(props),
-                loop_reset_to=props.get("loop_reset_to", "start"),
-                loop_area=_bool(props.get("loop_area"), False),
-                loop_min_x=props.get("loop_min_x"),
-                loop_max_x=props.get("loop_max_x"),
-                loop_min_y=props.get("loop_min_y"),
-                loop_max_y=props.get("loop_max_y"),
             )
         )
     return moving_platforms
-
-
-
-def _load_collapsing_platforms(layers):
-    collapsing_platforms = []
-    objects = []
-    objects.extend(_layer_objects(layers, "collapsingplatforms"))
-    objects.extend(_layer_objects(layers, "collapsing_platforms"))
-    objects.extend(_layer_objects(layers, "unstableplatforms"))
-
-    for obj in objects:
-        rect = _rect(obj)
-        if rect.width <= 0 or rect.height <= 0:
-            continue
-
-        props = _properties(obj)
-        collapsing_platforms.append(
-            CollapsingPlatform(
-                rect,
-                name=str(obj.get("name") or ""),
-                warning_time=_float(props.get("warning_time"), 0.6),
-                rebuild_delay=_float(props.get("rebuild_delay"), 3.0),
-                collapse_mode=str(props.get("collapse_mode") or props.get("mode") or "vanish"),
-                shake_px=_float(props.get("shake_px"), 3),
-            )
-        )
-
-    return collapsing_platforms
-
-
-def _moving_collision_behavior(props):
-    for key in ("collision_behavior", "on_collision", "hit_behavior"):
-        value = props.get(key)
-        if value not in (None, ""):
-            return value
-    for key in ("loop_on_collision", "wrap_on_collision", "loop", "wrap"):
-        if _bool(props.get(key), False):
-            return "loop"
-    return None
 
 
 def _move_type_from_name(name):

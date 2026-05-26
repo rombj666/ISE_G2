@@ -4252,6 +4252,19 @@ class LevelManager:
 
 
 
+    def prepare_map8_mechanics(self, tiled):
+        """Give MAP 8 Tiled mechanics the same runtime behavior as older levels."""
+        for moving_platform in tiled["moving_platforms"]:
+            if getattr(moving_platform, "unbounded", False):
+                moving_platform.unbounded = False
+                moving_platform.collision_behavior = "reverse"
+                if moving_platform.axis == "x":
+                    travel = 220 * moving_platform.direction
+                    moving_platform.end_x = moving_platform.start_x + travel
+                else:
+                    travel = 180 * moving_platform.direction
+                    moving_platform.end_y = moving_platform.start_y + travel
+
     def build_tiled_map8(self):
         map_path = Path(__file__).resolve().parents[2] / "assets" / "maps" / "map8.json"
         tiled = load_tiled_map(map_path)
@@ -4260,6 +4273,7 @@ class LevelManager:
             return self.build_level5_architecture_map8()
 
         player_spawn = tiled["player_spawn"] or (160, (tiled["height"] or MAP_8_HEIGHT) - 80)
+        self.prepare_map8_mechanics(tiled)
         return GameMap(
             8,
             "Level 5 - House of Architecture",

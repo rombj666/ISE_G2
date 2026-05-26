@@ -19,10 +19,6 @@ from settings import (
     MAP_5_WIDTH,
     MAP_6_HEIGHT,
     MAP_6_WIDTH,
-    MAP_7_HEIGHT,
-    MAP_7_WIDTH,
-    MAP_8_HEIGHT,
-    MAP_8_WIDTH,
     SCREEN_HEIGHT,
 )
 from src.levels.game_map import GameMap
@@ -161,35 +157,6 @@ def draw_moon_platform(screen, rect):
     draw_ledge_platform(screen, rect)
 
 
-def draw_map6_tiled_platform(screen, rect):
-    """Draw MAP 6 platforms inside their exact Tiled rectangle."""
-    top = (188, 192, 205)
-    face = (75, 80, 98)
-    side = (45, 51, 67)
-    dark = (34, 39, 54)
-    cyan = (72, 210, 245)
-
-    pygame.draw.rect(screen, face, rect)
-
-    cap_h = min(7, max(2, rect.height))
-    pygame.draw.rect(screen, top, (rect.x, rect.y, rect.width, cap_h))
-    pygame.draw.rect(screen, (235, 238, 246), (rect.x, rect.y, rect.width, min(2, cap_h)))
-
-    if rect.height >= 16:
-        pygame.draw.rect(screen, dark, (rect.x, rect.bottom - min(6, rect.height), rect.width, min(6, rect.height)))
-        for x in range(rect.x + 16, rect.right - 10, 44):
-            pygame.draw.rect(screen, dark, (x, rect.y + min(17, rect.height - 5), 12, 3))
-
-    for x in range(rect.x + 50, rect.right - 20, 130):
-        pygame.draw.rect(screen, cyan, (x, rect.y + min(9, max(1, rect.height - 3)), 16, 3))
-
-    if rect.width <= 90 and rect.height >= 90:
-        pygame.draw.rect(screen, side, (rect.x, rect.y, min(4, rect.width), rect.height))
-        pygame.draw.rect(screen, side, (rect.right - min(4, rect.width), rect.y, min(4, rect.width), rect.height))
-        for y in range(rect.y + 28, rect.bottom - 8, 34):
-            pygame.draw.rect(screen, dark, (rect.x + 4, y, max(0, rect.width - 8), 2))
-
-
 def draw_collapsing_platform(screen, camera, platform):
     """Draw unstable military platforms with warning lights and rebuild scanlines."""
     base_rect = platform.rect.copy()
@@ -240,10 +207,9 @@ def draw_collapsing_platform(screen, camera, platform):
     for x in range(draw_rect.x + 24, draw_rect.right - 10, 56):
         pygame.draw.rect(screen, cyan, (x, draw_rect.y + 9, 18, 3))
 
-    tooth_pattern = [4, 6, 5, 7]
-    tooth_y = draw_rect.bottom - min(8, draw_rect.height)
+    tooth_pattern = [8, 14, 10, 16]
     for i, x in enumerate(range(draw_rect.x + 14, draw_rect.right - 14, 28)):
-        pygame.draw.rect(screen, under, (x, tooth_y, 10, min(tooth_pattern[i % len(tooth_pattern)], draw_rect.height)))
+        pygame.draw.rect(screen, under, (x, draw_rect.bottom - 1, 10, tooth_pattern[i % len(tooth_pattern)]))
 
     if platform.state == "warning":
         color = red if int(platform.timer * 12) % 2 == 0 else amber
@@ -3573,267 +3539,6 @@ def draw_map6_military_background(screen, camera, game_map):
         rect(x, 844, 36, 5, cyan)
 
 
-def draw_map7_architecture_checkpoint_background(screen, camera, game_map):
-    """Checkpoint after MAP 6: an underground service tunnel opening into House of Architecture."""
-    def apply_rect(rect):
-        return camera.apply_rect(rect) if camera is not None else rect
-
-    def apply_pos(pos):
-        return camera.apply_pos(pos) if camera is not None else pos
-
-    def rect(x, y, w, h, color, width=0):
-        pygame.draw.rect(screen, color, apply_rect(pygame.Rect(x, y, w, h)), width)
-
-    def line(a, b, color, width=2):
-        pygame.draw.line(screen, color, apply_pos(a), apply_pos(b), width)
-
-    def circle(x, y, radius, color, width=0):
-        pygame.draw.circle(screen, color, apply_pos((x, y)), radius, width)
-
-    bg = (4, 7, 12)
-    tunnel = (12, 17, 25)
-    tunnel_dark = (5, 9, 15)
-    steel = (52, 62, 82)
-    stone = (68, 74, 92)
-    stone_light = (178, 184, 205)
-    cyan = (75, 216, 250)
-    gold = (226, 184, 82)
-    teal = (94, 236, 190)
-    violet = (128, 96, 255)
-
-    screen.fill(bg)
-
-    # Left side: low military drainage tunnel from Level 4.
-    rect(0, 392, 610, 258, tunnel_dark)
-    rect(0, 392, 610, 18, (34, 43, 60))
-    rect(0, 626, 610, 24, (42, 49, 66))
-    for x in range(20, 600, 86):
-        rect(x, 410, 14, 216, (22, 30, 44))
-        for y in range(438, 610, 52):
-            rect(x - 8, y, 30, 5, steel)
-    for x in range(46, 570, 96):
-        line((x, 420), (x + 56, 472), (20, 31, 48), 2)
-        rect(x + 12, 616, 34, 5, cyan)
-    for x in range(115, 545, 130):
-        rect(x, 474, 82, 10, steel)
-        rect(x + 12, 486, 52, 5, (20, 26, 38))
-
-    # The tunnel mouth where the military concrete gives way to architecture stone.
-    rect(560, 360, 150, 290, (9, 13, 20))
-    pygame.draw.arc(screen, stone_light, apply_rect(pygame.Rect(548, 335, 174, 190)), 3.14, 6.28, 6)
-    pygame.draw.arc(screen, stone, apply_rect(pygame.Rect(566, 355, 138, 156)), 3.14, 6.28, 5)
-    rect(584, 474, 98, 152, (5, 9, 14))
-    for y in range(388, 617, 46):
-        rect(552, y, 18, 7, gold)
-        rect(700, y, 18, 7, gold)
-
-    # Open architecture-city safe area.
-    rect(690, 110, game_map.width - 690, 540, (8, 13, 22))
-    rect(690, 96, game_map.width - 690, 18, (31, 40, 58))
-    rect(690, 620, game_map.width - 690, 30, (34, 42, 58))
-
-    # Tall geometric ribs and arches.
-    for x in range(760, game_map.width, 210):
-        rect(x, 124, 10, 500, (34, 44, 64))
-        rect(x + 132, 124, 10, 500, (24, 32, 49))
-        for y in range(170, 585, 78):
-            line((x, y), (x + 132, y - 34), (21, 31, 50), 2)
-            line((x + 132, y - 34), (x + 132, y + 34), (21, 31, 50), 2)
-        pygame.draw.arc(screen, (42, 58, 84), apply_rect(pygame.Rect(x - 14, 132, 166, 185)), 3.14, 6.28, 3)
-
-    # Distant architecture city: impossible columns, suspended halls, moonlit plans.
-    for x, h, c in [
-        (760, 210, (13, 22, 36)), (930, 285, (10, 19, 32)), (1120, 240, (15, 24, 38)),
-        (1320, 325, (11, 18, 31)), (1540, 230, (15, 25, 39)),
-    ]:
-        rect(x, 640 - h, 110, h, c)
-        rect(x + 20, 640 - h - 30, 70, 30, c)
-        for y in range(640 - h + 34, 610, 62):
-            rect(x + 28, y, 20, 32, (18, 51, 78))
-            rect(x + 66, y + 12, 20, 26, (44, 34, 82))
-
-    # Blueprint panels and construction glyphs.
-    rect(940, 180, 250, 92, (7, 15, 25))
-    pygame.draw.rect(screen, (64, 204, 236), apply_rect(pygame.Rect(940, 180, 250, 92)), 2)
-    line((970, 222), (1162, 222), cyan, 3)
-    line((970, 246), (1115, 246), (94, 236, 190), 3)
-    circle(1118, 222, 8, cyan, 2)
-    circle(1076, 246, 6, teal, 2)
-
-    rect(1255, 284, 285, 118, (6, 13, 23))
-    pygame.draw.rect(screen, (88, 106, 142), apply_rect(pygame.Rect(1255, 284, 285, 118)), 2)
-    for i in range(5):
-        x = 1288 + i * 48
-        line((x, 370), (x + 22, 326), cyan if i % 2 == 0 else gold, 3)
-        circle(x + 22, 326, 5, cyan if i % 2 == 0 else gold)
-    line((1288, 370), (1505, 370), (82, 236, 184), 3)
-
-    # Safe-area props: shop alcove and moon altar alcove are drawn behind the real interactables.
-    rect(900, 520, 250, 110, (30, 22, 20))
-    pygame.draw.rect(screen, (111, 78, 48), apply_rect(pygame.Rect(900, 520, 250, 110)), 3)
-    rect(920, 540, 210, 18, (70, 48, 31))
-    rect(934, 574, 15, 30, cyan)
-    rect(958, 570, 13, 34, teal)
-    rect(1028, 571, 14, 33, violet)
-    rect(1060, 578, 13, 26, gold)
-    rect(925, 608, 202, 6, (82, 56, 34))
-
-    rect(1220, 520, 132, 110, (7, 13, 24))
-    pygame.draw.rect(screen, (58, 74, 100), apply_rect(pygame.Rect(1220, 520, 132, 110)), 2)
-    pygame.draw.circle(screen, (48, 126, 155), apply_pos((1286, 552)), 34, 2)
-    pygame.draw.circle(screen, (185, 232, 255), apply_pos((1286, 552)), 12)
-    pygame.draw.circle(screen, (92, 216, 255), apply_pos((1292, 550)), 8)
-    rect(1246, 604, 80, 10, (48, 58, 78))
-
-    # Right side: unfinished path into House of Architecture.
-    rect(1580, 250, 210, 400, (5, 9, 15))
-    pygame.draw.arc(screen, (184, 190, 214), apply_rect(pygame.Rect(1558, 206, 254, 260)), 3.14, 6.28, 6)
-    pygame.draw.arc(screen, (76, 86, 110), apply_rect(pygame.Rect(1584, 234, 202, 206)), 3.14, 6.28, 4)
-    rect(1625, 430, 120, 190, (3, 7, 12))
-    rect(1636, 442, 98, 8, cyan)
-    rect(1666, 472, 38, 78, violet)
-    for y in [300, 352, 404]:
-        rect(1550, y, 34, 6, gold)
-        rect(1786, y, 34, 6, gold)
-
-    # Foreground depth.
-    rect(0, 666, game_map.width, 54, (3, 5, 9))
-    for x in range(-10, game_map.width, 48):
-        rect(x, 670, 30, 8, (42, 50, 66))
-    line((0, 688), (game_map.width, 688), (88, 95, 112), 3)
-    line((0, 710), (game_map.width, 710), (39, 47, 64), 3)
-
-
-def draw_map8_architecture_final_background(screen, camera, game_map):
-    """Clean moon-architecture background for Level 5 Tiled gameplay."""
-    def apply_rect(rect):
-        return camera.apply_rect(rect) if camera is not None else rect
-
-    def apply_pos(pos):
-        return camera.apply_pos(pos) if camera is not None else pos
-
-    def rect(x, y, w, h, color, width=0):
-        pygame.draw.rect(screen, color, apply_rect(pygame.Rect(int(x), int(y), int(w), int(h))), width)
-
-    def line(a, b, color, width=2):
-        pygame.draw.line(screen, color, apply_pos(a), apply_pos(b), width)
-
-    def circle(x, y, radius, color, width=0):
-        pygame.draw.circle(screen, color, apply_pos((int(x), int(y))), int(radius), width)
-
-    def arc(x, y, w, h, start, end, color, width=2):
-        pygame.draw.arc(screen, color, apply_rect(pygame.Rect(int(x), int(y), int(w), int(h))), start, end, width)
-
-    def glow(cx, cy, w, h, color):
-        draw_rect = apply_rect(pygame.Rect(int(cx - w / 2), int(cy - h / 2), int(w), int(h)))
-        if draw_rect.width <= 0 or draw_rect.height <= 0:
-            return
-        surface = pygame.Surface((max(1, draw_rect.width), max(1, draw_rect.height)), pygame.SRCALPHA)
-        for i, alpha in enumerate((38, 24, 15, 8)):
-            inset = i * 34
-            pygame.draw.ellipse(
-                surface,
-                (*color, alpha),
-                pygame.Rect(inset, inset, max(1, draw_rect.width - inset * 2), max(1, draw_rect.height - inset * 2)),
-            )
-        screen.blit(surface, draw_rect.topleft)
-
-    width = game_map.width
-    height = game_map.height
-    screen.fill((2, 5, 12))
-    rect(0, 0, width, height, (2, 5, 12))
-
-    # Quiet cosmic depth.
-    for y in range(0, height, 90):
-        shade = 8 + (y // 90) * 2
-        rect(0, y, width, 90, (3, shade, 18 + (y // 180) * 2))
-
-    for i in range(180):
-        x = (i * 557 + 83) % max(1, width)
-        y = 36 + ((i * 149) % 560)
-        color = (68, 126, 164) if i % 4 else (125, 215, 246)
-        size = 1 if i % 5 else 2
-        rect(x, y, size, size, color)
-
-    # The final moon and distant Lunar Core glow are large and clean, not noisy.
-    glow(9800, 165, 980, 620, (105, 185, 255))
-    circle(9800, 165, 175, (183, 202, 231))
-    circle(9868, 106, 32, (147, 164, 194))
-    circle(9720, 206, 42, (151, 169, 199))
-    circle(9895, 226, 22, (142, 160, 191))
-
-    glow(10420, 520, 1050, 520, (100, 90, 255))
-    for r, color in ((240, (54, 72, 120)), (176, (72, 220, 248)), (112, (152, 118, 255))):
-        circle(10420, 520, r, color, 3)
-    line((10420, 278), (10420, 766), (86, 222, 250), 2)
-    line((10170, 520), (10670, 520), (126, 96, 255), 2)
-
-    # Massive architecture supports. These give the scene structure without clutter.
-    for index, x in enumerate(range(180, width, 620)):
-        top = 84 + (index % 4) * 32
-        pillar_w = 54 + (index % 3) * 10
-        rect(x, top, pillar_w, height - top, (10, 18, 32))
-        rect(x + 8, top, 4, height - top, (36, 58, 84))
-        rect(x + pillar_w - 10, top, 3, height - top, (4, 8, 16))
-        for y in range(top + 60, height - 30, 92):
-            rect(x - 22, y, pillar_w + 44, 8, (36, 45, 66))
-            rect(x + pillar_w // 2 - 3, y - 26, 6, 20, (74, 210, 238))
-
-    # Long celestial rails and bridge systems behind the playable platforms.
-    for y, color in ((210, (31, 49, 78)), (360, (25, 42, 70)), (548, (21, 37, 62))):
-        line((0, y), (width, y), color, 2)
-        for x in range(0, width, 720):
-            line((x + 60, y), (x + 220, y - 70), (18, 31, 55), 1)
-            line((x + 300, y - 74), (x + 480, y), (18, 31, 55), 1)
-
-    # Connected moon-transit rings.
-    ring_data = [
-        (1300, 430, 360, 300, (65, 207, 238)),
-        (3050, 385, 440, 360, (100, 235, 190)),
-        (5350, 440, 520, 420, (130, 104, 255)),
-        (7600, 420, 470, 380, (78, 220, 250)),
-        (9100, 500, 420, 340, (144, 115, 255)),
-    ]
-    for cx, cy, rw, rh, accent in ring_data:
-        arc(cx - rw // 2, cy - rh // 2, rw, rh, math.radians(196), math.radians(344), (39, 54, 84), 5)
-        arc(cx - rw // 2 + 36, cy - rh // 2 + 28, rw - 72, rh - 56, math.radians(202), math.radians(338), accent, 2)
-        line((cx - rw // 2, cy), (cx + rw // 2, cy), (21, 36, 62), 2)
-        circle(cx, cy, 8, accent)
-
-    # Hanging gardens and moon-waterfalls.
-    for x in range(1500, 3000, 360):
-        rect(x, 500, 230, 18, (42, 58, 74))
-        rect(x + 24, 487, 180, 13, (42, 92, 76))
-        for vx in range(x + 36, x + 205, 42):
-            line((vx, 500), (vx - 18, 620), (28, 84, 70), 2)
-        for drop_x in (x + 56, x + 156):
-            line((drop_x, 518), (drop_x, 700), (60, 194, 222), 1)
-            line((drop_x + 8, 540), (drop_x + 8, 720), (25, 78, 102), 1)
-
-    # Broken city section: cracked but readable.
-    for x in range(3300, 4700, 300):
-        rect(x, 150 + (x // 300 % 4) * 52, 150, 460, (8, 14, 26))
-        rect(x + 18, 180 + (x // 300 % 4) * 52, 112, 6, (69, 205, 230))
-        line((x + 16, 225), (x + 118, 326), (37, 48, 74), 2)
-        line((x + 132, 244), (x + 54, 410), (37, 48, 74), 2)
-
-    # Cathedral silhouettes around the finale.
-    for x in range(8500, 10900, 360):
-        base = 790
-        spire_h = 310 + (x // 360 % 3) * 70
-        rect(x, base - spire_h, 120, spire_h, (5, 10, 22))
-        rect(x + 44, base - spire_h - 90, 32, 90, (6, 12, 25))
-        line((x + 60, base - spire_h - 124), (x + 60, base - spire_h - 10), (65, 200, 230), 2)
-        for y in range(base - spire_h + 54, base - 40, 96):
-            circle(x + 60, y, 10, (91, 80, 166), 2)
-
-    # Abyss band below: calm darkness, so bottom areas read as dangerous depth.
-    rect(0, height - 88, width, 88, (0, 2, 8))
-    line((0, height - 88), (width, height - 88), (18, 29, 48), 3)
-    for x in range(40, width, 260):
-        line((x, height - 82), (x + 110, height - 44), (9, 17, 30), 1)
-
-
 
 class LevelManager:
     def __init__(self):
@@ -3861,8 +3566,6 @@ class LevelManager:
         self.map3_moon_altar_used = False
         self.map5_moon_altar_rect = pygame.Rect(535, 556, 82, 68)
         self.map5_moon_altar_used = False
-        self.map7_moon_altar_rect = pygame.Rect(1245, 536, 82, 68)
-        self.map7_moon_altar_used = False
 
 
     def build_default_map1(self):
@@ -4139,27 +3842,15 @@ class LevelManager:
         if tiled is None or not tiled["platforms"]:
             return self.build_level4_military_map6()
 
-        map_width = tiled["width"] or MAP_6_WIDTH
-        map_height = tiled["height"] or MAP_6_HEIGHT
-        player_spawn = tiled["player_spawn"] or (160, map_height - 80)
-        doors = list(tiled["doors"])
-        doors.append(
-            {
-                "rect": pygame.Rect(map_width - 72, max(0, map_height - 118), 82, 108),
-                "target_map": 7,
-                "label": "Architecture underpass",
-                "visible": False,
-                "auto": True,
-            }
-        )
+        player_spawn = tiled["player_spawn"] or (160, (tiled["height"] or MAP_6_HEIGHT) - 80)
         return GameMap(
             6,
             "House of Military",
-            map_width,
-            map_height,
+            tiled["width"] or MAP_6_WIDTH,
+            tiled["height"] or MAP_6_HEIGHT,
             tiled["platforms"],
             player_spawn,
-            doors,
+            tiled["doors"],
             enemy_spawns=tiled["enemy_spawns"],
             boss_spawn=tiled["boss_spawn"],
             fulcrums=tiled["fulcrums"],
@@ -4205,102 +3896,8 @@ class LevelManager:
                 pygame.Rect(11440, 820, 520, 32),
             ],
             (220, 820),
-            [
-                {
-                    "rect": pygame.Rect(MAP_6_WIDTH - 72, MAP_6_HEIGHT - 118, 82, 108),
-                    "target_map": 7,
-                    "label": "Architecture underpass",
-                    "visible": False,
-                    "auto": True,
-                }
-            ],
-            map_type="level4_stage",
-        )
-
-
-    def build_checkpoint_map7(self):
-        return GameMap(
-            7,
-            "Checkpoint - Architecture Subgate",
-            MAP_7_WIDTH,
-            MAP_7_HEIGHT,
-            [
-                pygame.Rect(0, 650, MAP_7_WIDTH, 70),
-                pygame.Rect(0, 0, MAP_7_WIDTH, 40),
-                pygame.Rect(0, 40, 54, 610),
-                pygame.Rect(0, 392, 610, 40),
-                pygame.Rect(0, 620, 720, 30),
-                pygame.Rect(690, 620, 1110, 30),
-                pygame.Rect(820, 565, 150, 24),
-                pygame.Rect(1140, 540, 140, 24),
-                pygame.Rect(1390, 505, 160, 24),
-                pygame.Rect(1540, 620, 260, 30),
-            ],
-            (126, 620),
-            [
-                {
-                    "rect": pygame.Rect(MAP_7_WIDTH - 70, 520, 90, 130),
-                    "target_map": 8,
-                    "label": "House of Architecture",
-                    "visible": False,
-                    "auto": True,
-                }
-            ],
-            shop_rect=pygame.Rect(930, 548, 180, 92),
-            map_type="checkpoint_stage",
-        )
-
-
-
-    def build_tiled_map8(self):
-        map_path = Path(__file__).resolve().parents[2] / "assets" / "maps" / "map8.json"
-        tiled = load_tiled_map(map_path)
-
-        if tiled is None or not tiled["platforms"]:
-            return self.build_level5_architecture_map8()
-
-        player_spawn = tiled["player_spawn"] or (160, (tiled["height"] or MAP_8_HEIGHT) - 80)
-        return GameMap(
-            8,
-            "Level 5 - House of Architecture",
-            tiled["width"] or MAP_8_WIDTH,
-            tiled["height"] or MAP_8_HEIGHT,
-            tiled["platforms"],
-            player_spawn,
-            tiled["doors"],
-            enemy_spawns=tiled["enemy_spawns"],
-            boss_spawn=tiled["boss_spawn"],
-            fulcrums=tiled["fulcrums"],
-            shop_rect=tiled["shop_rect"],
-            moving_platforms=tiled["moving_platforms"],
-            collapsing_platforms=tiled["collapsing_platforms"],
-            checkpoints=tiled["checkpoints"],
-            interactables=tiled["interactables"],
-            hazards=tiled["hazards"],
-            map_type="level5_stage",
-        )
-
-
-    def build_level5_architecture_map8(self):
-        return GameMap(
-            8,
-            "Level 5 - House of Architecture",
-            MAP_8_WIDTH,
-            MAP_8_HEIGHT,
-            [
-                pygame.Rect(0, 650, MAP_8_WIDTH, 70),
-                pygame.Rect(0, 0, MAP_8_WIDTH, 40),
-                pygame.Rect(0, 40, 44, 610),
-                pygame.Rect(MAP_8_WIDTH - 44, 40, 44, 610),
-                pygame.Rect(470, 535, 210, 30),
-                pygame.Rect(840, 470, 190, 30),
-                pygame.Rect(1220, 405, 230, 30),
-                pygame.Rect(1650, 520, 260, 30),
-                pygame.Rect(2140, 430, 260, 30),
-            ],
-            (170, 650),
             [],
-            map_type="level5_stage",
+            map_type="level4_stage",
         )
 
 
@@ -4533,16 +4130,6 @@ class LevelManager:
             # MAP 6: LEVEL 4 - House of Military
             # =========================================================================
             6: self.build_tiled_map6(),
-
-            # =========================================================================
-            # MAP 7: LEVEL 4 Checkpoint - Architecture Subgate
-            # =========================================================================
-            7: self.build_checkpoint_map7(),
-
-            # =========================================================================
-            # MAP 8: LEVEL 5 - House of Architecture
-            # =========================================================================
-            8: self.build_tiled_map8(),
         }
 
 
@@ -4550,7 +4137,6 @@ class LevelManager:
         self.map1_moon_altar_used = False
         self.map3_moon_altar_used = False
         self.map5_moon_altar_used = False
-        self.map7_moon_altar_used = False
 
     def get_moon_altar_rect(self):
         if self.current_map_id == 1:
@@ -4559,8 +4145,6 @@ class LevelManager:
             return self.map3_moon_altar_rect
         if self.current_map_id == 5:
             return self.map5_moon_altar_rect
-        if self.current_map_id == 7:
-            return self.map7_moon_altar_rect
         return None
 
     def _is_current_moon_altar_used(self):
@@ -4570,8 +4154,6 @@ class LevelManager:
             return self.map3_moon_altar_used
         if self.current_map_id == 5:
             return self.map5_moon_altar_used
-        if self.current_map_id == 7:
-            return self.map7_moon_altar_used
         return True
 
     def _set_current_moon_altar_used(self):
@@ -4581,8 +4163,6 @@ class LevelManager:
             self.map3_moon_altar_used = True
         elif self.current_map_id == 5:
             self.map5_moon_altar_used = True
-        elif self.current_map_id == 7:
-            self.map7_moon_altar_used = True
 
     def can_use_moon_altar(self, player):
         altar_rect = self.get_moon_altar_rect()
@@ -4832,10 +4412,6 @@ class LevelManager:
             draw_map5_fighter_trash_checkpoint_background(screen, camera, self.current_map)
         elif self.current_map.map_id == 6:
             draw_map6_military_background(screen, camera, self.current_map)
-        elif self.current_map.map_id == 7:
-            draw_map7_architecture_checkpoint_background(screen, camera, self.current_map)
-        elif self.current_map.map_id == 8:
-            draw_map8_architecture_final_background(screen, camera, self.current_map)
         else:
             # 1. Background (moon, stars, distant city silhouette)
             draw_moon_background(screen, camera, self.current_map)
@@ -4868,15 +4444,9 @@ class LevelManager:
             draw_rect = platform
             if camera is not None:
                 draw_rect = camera.apply_rect(platform)
-            if self.current_map.map_id in (6, 8):
-                draw_map6_tiled_platform(screen, draw_rect)
-            else:
-                draw_moon_platform(screen, draw_rect)
+            draw_moon_platform(screen, draw_rect)
 
-        for collapsing_platform in getattr(self.current_map, "collapsing_platforms", []):
-            draw_collapsing_platform(screen, camera, collapsing_platform)
-
-        if self.current_map.map_id in (1, 3, 5, 7):
+        if self.current_map.map_id in (1, 3, 5):
             draw_map1_moon_altar(
                 screen,
                 camera,

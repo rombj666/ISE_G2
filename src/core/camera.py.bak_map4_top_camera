@@ -11,12 +11,10 @@ class Camera:
         self.screen_height = screen_height
         self.map_width = map_width
         self.map_height = map_height
-        self.top_margin = 0
 
-    def set_map_size(self, map_width, map_height, top_margin=0):
+    def set_map_size(self, map_width, map_height):
         self.map_width = map_width
         self.map_height = map_height
-        self.top_margin = max(0, int(top_margin))
         self.x = self.clamp_x(self.x)
         self.y = self.clamp_y(self.y)
 
@@ -34,8 +32,7 @@ class Camera:
 
     def clamp_y(self, value):
         max_y = max(0, self.map_height - self.screen_height)
-        min_y = -self.top_margin
-        return max(min_y, min(value, max_y))
+        return max(0, min(value, max_y))
 
     def snap_to(self, target_rect):
         self.x = self.clamp_x(target_rect.centerx - self.screen_width / 2)

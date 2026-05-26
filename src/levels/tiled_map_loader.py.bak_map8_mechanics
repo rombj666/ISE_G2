@@ -56,8 +56,8 @@ class CollapsingPlatform:
             player.rect.right > self.rect.left + 4
             and player.rect.left < self.rect.right - 4
         )
-        vertical_contact = self.rect.top - 12 <= player.rect.bottom <= self.rect.top + 16
-        return horizontal_overlap and vertical_contact and player.vel_y >= -1
+        vertical_contact = abs(player.rect.bottom - self.rect.top) <= 8
+        return horizontal_overlap and vertical_contact and player.vel_y >= 0
 
     def update(self, dt, player):
         if self.state == "stable":
@@ -213,8 +213,8 @@ class MovingPlatform:
             player.rect.right > self.rect.left + 4
             and player.rect.left < self.rect.right - 4
         )
-        vertical_contact = self.rect.top - 12 <= player.rect.bottom <= self.rect.top + 16
-        return horizontal_overlap and vertical_contact and player.vel_y >= -1
+        vertical_contact = abs(player.rect.bottom - self.rect.top) <= 8
+        return horizontal_overlap and vertical_contact and player.vel_y >= 0
 
     def update(self, dt, player, solid_rects=None):
         if self.arrived or self.speed <= 0:

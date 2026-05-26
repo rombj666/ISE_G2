@@ -307,7 +307,7 @@ def main():
             nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
 
             if e_pressed and nearby_fulcrum is not None and not map_changed:
-                if current_map.map_id in (2, 8):
+                if current_map.map_id == 2:
                     player.start_swing(nearby_fulcrum["anchor"])
                 else:
                     player.start_auto_grapple(nearby_fulcrum["anchor"], nearby_fulcrum["target"])
@@ -378,8 +378,8 @@ def main():
         if shop_active:
             shop.draw_shop_area(screen, camera)
 
-        # Tiled grapple fulcrums: visible anchor points.
-        if current_map.map_id in (2, 8):
+        # MAP 2 grapple fulcrums: visible anchor points from Tiled.
+        if current_map.map_id == 2:
             for fulcrum in fulcrums:
                 anchor_pos = camera.apply_pos(fulcrum["anchor"])
                 pygame.draw.circle(screen, (42, 28, 70), anchor_pos, 30)

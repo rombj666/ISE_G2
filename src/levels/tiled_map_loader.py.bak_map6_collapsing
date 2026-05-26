@@ -4,80 +4,6 @@ from pathlib import Path
 import pygame
 
 
-
-class CollapsingPlatform:
-    """Temporary military platform loaded from Tiled's CollapsingPlatforms layer."""
-
-    def __init__(
-        self,
-        rect,
-        name="",
-        warning_time=0.6,
-        rebuild_delay=3.0,
-        collapse_mode="vanish",
-        shake_px=3,
-    ):
-        self.rect = rect
-        self.home_rect = rect.copy()
-        self.name = name
-        self.warning_time = max(0.05, float(warning_time))
-        self.rebuild_delay = max(0.1, float(rebuild_delay))
-        self.collapse_mode = str(collapse_mode or "vanish").strip().lower()
-        self.shake_px = int(round(float(shake_px)))
-        self.state = "stable"
-        self.timer = 0.0
-
-    @property
-    def is_solid(self):
-        return self.state in ("stable", "warning")
-
-    @property
-    def warning_progress(self):
-        if self.state != "warning":
-            return 0.0
-        return min(1.0, self.timer / self.warning_time)
-
-    @property
-    def rebuild_progress(self):
-        if self.state != "collapsed":
-            return 1.0
-        return min(1.0, self.timer / self.rebuild_delay)
-
-    def reset(self):
-        self.rect.x = self.home_rect.x
-        self.rect.y = self.home_rect.y
-        self.rect.width = self.home_rect.width
-        self.rect.height = self.home_rect.height
-        self.state = "stable"
-        self.timer = 0.0
-
-    def player_is_on_top(self, player):
-        horizontal_overlap = (
-            player.rect.right > self.rect.left + 4
-            and player.rect.left < self.rect.right - 4
-        )
-        vertical_contact = self.rect.top - 12 <= player.rect.bottom <= self.rect.top + 16
-        return horizontal_overlap and vertical_contact and player.vel_y >= -1
-
-    def update(self, dt, player):
-        if self.state == "stable":
-            if self.player_is_on_top(player):
-                self.state = "warning"
-                self.timer = 0.0
-            return
-
-        self.timer += dt
-
-        if self.state == "warning":
-            if self.timer >= self.warning_time:
-                self.state = "collapsed"
-                self.timer = 0.0
-            return
-
-        if self.state == "collapsed" and self.timer >= self.rebuild_delay:
-            self.reset()
-
-
 class MovingPlatform:
     HORIZONTAL_TYPES = {"horizontal", "left_right", "leftright", "x", "patrol_x"}
     VERTICAL_TYPES = {"vertical", "up_down", "updown", "y", "patrol_y"}
@@ -213,8 +139,8 @@ class MovingPlatform:
             player.rect.right > self.rect.left + 4
             and player.rect.left < self.rect.right - 4
         )
-        vertical_contact = self.rect.top - 12 <= player.rect.bottom <= self.rect.top + 16
-        return horizontal_overlap and vertical_contact and player.vel_y >= -1
+        vertical_contact = abs(player.rect.bottom - self.rect.top) <= 8
+        return horizontal_overlap and vertical_contact and player.vel_y >= 0
 
     def update(self, dt, player, solid_rects=None):
         if self.arrived or self.speed <= 0:
@@ -381,7 +307,6 @@ def load_tiled_map(path):
     platforms = list(collision_platforms)
     moving_platforms = _load_moving_platforms(layers)
     platforms.extend(platform.rect for platform in moving_platforms)
-    collapsing_platforms = _load_collapsing_platforms(layers)
 
     spawns = _load_spawns(layers)
     doors = _load_doors(layers)
@@ -403,7 +328,6 @@ def load_tiled_map(path):
         "platforms": platforms,
         "collision_platforms": collision_platforms,
         "moving_platforms": moving_platforms,
-        "collapsing_platforms": collapsing_platforms,
         "player_spawn": spawns.get("player_spawn"),
         "enemy_spawns": spawns.get("enemy_spawns", []),
         "boss_spawn": spawns.get("boss_spawn"),
@@ -494,34 +418,6 @@ def _load_moving_platforms(layers):
             )
         )
     return moving_platforms
-
-
-
-def _load_collapsing_platforms(layers):
-    collapsing_platforms = []
-    objects = []
-    objects.extend(_layer_objects(layers, "collapsingplatforms"))
-    objects.extend(_layer_objects(layers, "collapsing_platforms"))
-    objects.extend(_layer_objects(layers, "unstableplatforms"))
-
-    for obj in objects:
-        rect = _rect(obj)
-        if rect.width <= 0 or rect.height <= 0:
-            continue
-
-        props = _properties(obj)
-        collapsing_platforms.append(
-            CollapsingPlatform(
-                rect,
-                name=str(obj.get("name") or ""),
-                warning_time=_float(props.get("warning_time"), 0.6),
-                rebuild_delay=_float(props.get("rebuild_delay"), 3.0),
-                collapse_mode=str(props.get("collapse_mode") or props.get("mode") or "vanish"),
-                shake_px=_float(props.get("shake_px"), 3),
-            )
-        )
-
-    return collapsing_platforms
 
 
 def _moving_collision_behavior(props):

@@ -3705,7 +3705,7 @@ def draw_map7_architecture_checkpoint_background(screen, camera, game_map):
 
 
 def draw_map8_architecture_final_background(screen, camera, game_map):
-    """Clean moon-architecture background for Level 5 Tiled gameplay."""
+    """Level 5 placeholder: House of Architecture, final moon-city district."""
     def apply_rect(rect):
         return camera.apply_rect(rect) if camera is not None else rect
 
@@ -3713,125 +3713,70 @@ def draw_map8_architecture_final_background(screen, camera, game_map):
         return camera.apply_pos(pos) if camera is not None else pos
 
     def rect(x, y, w, h, color, width=0):
-        pygame.draw.rect(screen, color, apply_rect(pygame.Rect(int(x), int(y), int(w), int(h))), width)
+        pygame.draw.rect(screen, color, apply_rect(pygame.Rect(x, y, w, h)), width)
 
     def line(a, b, color, width=2):
         pygame.draw.line(screen, color, apply_pos(a), apply_pos(b), width)
 
     def circle(x, y, radius, color, width=0):
-        pygame.draw.circle(screen, color, apply_pos((int(x), int(y))), int(radius), width)
+        pygame.draw.circle(screen, color, apply_pos((x, y)), radius, width)
 
-    def arc(x, y, w, h, start, end, color, width=2):
-        pygame.draw.arc(screen, color, apply_rect(pygame.Rect(int(x), int(y), int(w), int(h))), start, end, width)
+    screen.fill((4, 7, 14))
 
-    def glow(cx, cy, w, h, color):
-        draw_rect = apply_rect(pygame.Rect(int(cx - w / 2), int(cy - h / 2), int(w), int(h)))
-        if draw_rect.width <= 0 or draw_rect.height <= 0:
-            return
-        surface = pygame.Surface((max(1, draw_rect.width), max(1, draw_rect.height)), pygame.SRCALPHA)
-        for i, alpha in enumerate((38, 24, 15, 8)):
-            inset = i * 34
-            pygame.draw.ellipse(
-                surface,
-                (*color, alpha),
-                pygame.Rect(inset, inset, max(1, draw_rect.width - inset * 2), max(1, draw_rect.height - inset * 2)),
-            )
-        screen.blit(surface, draw_rect.topleft)
+    # Night architecture skyline: impossible arcs, blueprint towers, moonlit scaffolds.
+    rect(0, 0, game_map.width, game_map.height, (4, 7, 14))
+    rect(0, 610, game_map.width, 110, (6, 9, 14))
 
-    width = game_map.width
-    height = game_map.height
-    screen.fill((2, 5, 12))
-    rect(0, 0, width, height, (2, 5, 12))
+    for x in range(-80, game_map.width, 220):
+        h = 260 + ((x // 220) % 5) * 52
+        rect(x, 650 - h, 140, h, (9, 16, 29))
+        rect(x + 20, 650 - h - 44, 100, 44, (12, 21, 36))
+        for y in range(650 - h + 42, 610, 66):
+            rect(x + 28, y, 22, 36, (18, 58, 88))
+            rect(x + 78, y + 12, 22, 28, (56, 40, 96))
 
-    # Quiet cosmic depth.
-    for y in range(0, height, 90):
-        shade = 8 + (y // 90) * 2
-        rect(0, y, width, 90, (3, shade, 18 + (y // 180) * 2))
+    for x in range(220, game_map.width, 560):
+        pygame.draw.arc(screen, (42, 64, 96), apply_rect(pygame.Rect(x, 155, 360, 420)), 3.14, 6.28, 4)
+        pygame.draw.arc(screen, (38, 210, 245), apply_rect(pygame.Rect(x + 40, 195, 280, 340)), 3.14, 6.28, 2)
+        line((x + 180, 155), (x + 180, 610), (32, 44, 68), 4)
 
-    for i in range(180):
-        x = (i * 557 + 83) % max(1, width)
-        y = 36 + ((i * 149) % 560)
-        color = (68, 126, 164) if i % 4 else (125, 215, 246)
-        size = 1 if i % 5 else 2
-        rect(x, y, size, size, color)
+    for x in range(90, game_map.width, 370):
+        rect(x, 96, 260, 82, (6, 14, 24))
+        pygame.draw.rect(screen, (64, 204, 236), apply_rect(pygame.Rect(x, 96, 260, 82)), 2)
+        line((x + 28, 126), (x + 220, 126), (78, 220, 250), 3)
+        line((x + 28, 152), (x + 165, 152), (92, 236, 190), 3)
+        circle(x + 188, 126, 8, (78, 220, 250), 2)
+        circle(x + 150, 152, 6, (92, 236, 190), 2)
 
-    # The final moon and distant Lunar Core glow are large and clean, not noisy.
-    glow(9800, 165, 980, 620, (105, 185, 255))
-    circle(9800, 165, 175, (183, 202, 231))
-    circle(9868, 106, 32, (147, 164, 194))
-    circle(9720, 206, 42, (151, 169, 199))
-    circle(9895, 226, 22, (142, 160, 191))
+    # Entrance underpass from MAP 7.
+    rect(0, 510, 340, 140, (5, 9, 15))
+    rect(0, 506, 340, 12, (42, 52, 72))
+    rect(285, 452, 86, 198, (8, 13, 22))
+    pygame.draw.arc(screen, (180, 188, 214), apply_rect(pygame.Rect(244, 402, 170, 160)), 3.14, 6.28, 5)
+    rect(306, 492, 42, 96, (3, 7, 12))
+    rect(312, 506, 30, 6, (76, 222, 250))
 
-    glow(10420, 520, 1050, 520, (100, 90, 255))
-    for r, color in ((240, (54, 72, 120)), (176, (72, 220, 248)), (112, (152, 118, 255))):
-        circle(10420, 520, r, color, 3)
-    line((10420, 278), (10420, 766), (86, 222, 250), 2)
-    line((10170, 520), (10670, 520), (126, 96, 255), 2)
+    # Final-level route hints.
+    for x, y, w in [(470, 535, 210), (840, 470, 190), (1220, 405, 230), (1650, 520, 260)]:
+        rect(x, y, w, 30, (74, 80, 98))
+        rect(x, y, w, 6, (188, 194, 212))
+        rect(x + 45, y + 12, 22, 3, (76, 222, 250))
+        for tx in range(x + 20, x + w - 10, 46):
+            rect(tx, y + 29, 10, 16, (34, 39, 54))
 
-    # Massive architecture supports. These give the scene structure without clutter.
-    for index, x in enumerate(range(180, width, 620)):
-        top = 84 + (index % 4) * 32
-        pillar_w = 54 + (index % 3) * 10
-        rect(x, top, pillar_w, height - top, (10, 18, 32))
-        rect(x + 8, top, 4, height - top, (36, 58, 84))
-        rect(x + pillar_w - 10, top, 3, height - top, (4, 8, 16))
-        for y in range(top + 60, height - 30, 92):
-            rect(x - 22, y, pillar_w + 44, 8, (36, 45, 66))
-            rect(x + pillar_w // 2 - 3, y - 26, 6, 20, (74, 210, 238))
+    # Big unfinished moon-drafting device.
+    circle(2140, 310, 120, (24, 34, 58), 4)
+    circle(2140, 310, 72, (78, 220, 250), 2)
+    line((2020, 310), (2260, 310), (82, 236, 190), 3)
+    line((2140, 190), (2140, 430), (126, 96, 255), 3)
+    for angle_x, angle_y in [(2070, 245), (2212, 245), (2070, 376), (2212, 376)]:
+        circle(angle_x, angle_y, 7, (230, 184, 82))
 
-    # Long celestial rails and bridge systems behind the playable platforms.
-    for y, color in ((210, (31, 49, 78)), (360, (25, 42, 70)), (548, (21, 37, 62))):
-        line((0, y), (width, y), color, 2)
-        for x in range(0, width, 720):
-            line((x + 60, y), (x + 220, y - 70), (18, 31, 55), 1)
-            line((x + 300, y - 74), (x + 480, y), (18, 31, 55), 1)
-
-    # Connected moon-transit rings.
-    ring_data = [
-        (1300, 430, 360, 300, (65, 207, 238)),
-        (3050, 385, 440, 360, (100, 235, 190)),
-        (5350, 440, 520, 420, (130, 104, 255)),
-        (7600, 420, 470, 380, (78, 220, 250)),
-        (9100, 500, 420, 340, (144, 115, 255)),
-    ]
-    for cx, cy, rw, rh, accent in ring_data:
-        arc(cx - rw // 2, cy - rh // 2, rw, rh, math.radians(196), math.radians(344), (39, 54, 84), 5)
-        arc(cx - rw // 2 + 36, cy - rh // 2 + 28, rw - 72, rh - 56, math.radians(202), math.radians(338), accent, 2)
-        line((cx - rw // 2, cy), (cx + rw // 2, cy), (21, 36, 62), 2)
-        circle(cx, cy, 8, accent)
-
-    # Hanging gardens and moon-waterfalls.
-    for x in range(1500, 3000, 360):
-        rect(x, 500, 230, 18, (42, 58, 74))
-        rect(x + 24, 487, 180, 13, (42, 92, 76))
-        for vx in range(x + 36, x + 205, 42):
-            line((vx, 500), (vx - 18, 620), (28, 84, 70), 2)
-        for drop_x in (x + 56, x + 156):
-            line((drop_x, 518), (drop_x, 700), (60, 194, 222), 1)
-            line((drop_x + 8, 540), (drop_x + 8, 720), (25, 78, 102), 1)
-
-    # Broken city section: cracked but readable.
-    for x in range(3300, 4700, 300):
-        rect(x, 150 + (x // 300 % 4) * 52, 150, 460, (8, 14, 26))
-        rect(x + 18, 180 + (x // 300 % 4) * 52, 112, 6, (69, 205, 230))
-        line((x + 16, 225), (x + 118, 326), (37, 48, 74), 2)
-        line((x + 132, 244), (x + 54, 410), (37, 48, 74), 2)
-
-    # Cathedral silhouettes around the finale.
-    for x in range(8500, 10900, 360):
-        base = 790
-        spire_h = 310 + (x // 360 % 3) * 70
-        rect(x, base - spire_h, 120, spire_h, (5, 10, 22))
-        rect(x + 44, base - spire_h - 90, 32, 90, (6, 12, 25))
-        line((x + 60, base - spire_h - 124), (x + 60, base - spire_h - 10), (65, 200, 230), 2)
-        for y in range(base - spire_h + 54, base - 40, 96):
-            circle(x + 60, y, 10, (91, 80, 166), 2)
-
-    # Abyss band below: calm darkness, so bottom areas read as dangerous depth.
-    rect(0, height - 88, width, 88, (0, 2, 8))
-    line((0, height - 88), (width, height - 88), (18, 29, 48), 3)
-    for x in range(40, width, 260):
-        line((x, height - 82), (x + 110, height - 44), (9, 17, 30), 1)
+    rect(0, 650, game_map.width, 70, (74, 80, 98))
+    rect(0, 650, game_map.width, 8, (188, 194, 212))
+    for x in range(40, game_map.width, 132):
+        rect(x, 664, 18, 4, (76, 222, 250))
+        rect(x + 56, 680, 14, 3, (34, 39, 54))
 
 
 
@@ -4249,7 +4194,6 @@ class LevelManager:
             shop_rect=pygame.Rect(930, 548, 180, 92),
             map_type="checkpoint_stage",
         )
-
 
 
     def build_tiled_map8(self):
