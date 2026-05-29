@@ -4028,12 +4028,12 @@ class LevelManager:
             [
                 {
                     "rect": pygame.Rect(MAP_1_WIDTH - 104, 430, 72, 220),
-                    "target_map": 4,
-                    "label": "Emergency Route",
+                    "target_map": 5,
+                    "label": "Scrap Trenches",
                     "visible": True,
                     "auto": False,
                     "style": "map3_emergency_ladder",
-                    "prompt": "Press E to climb emergency route",
+                    "prompt": "Press E to enter scrap trenches",
                 }
             ],
             shop_rect=pygame.Rect(540, 528, 180, 92),
@@ -4121,8 +4121,8 @@ class LevelManager:
             [
                 {
                     "rect": pygame.Rect(MAP_5_WIDTH - 96, 540, 122, 110),
-                    "target_map": 6,
-                    "label": "House of Military",
+                    "target_map": 7,
+                    "label": "Architecture Subgate",
                     "visible": False,
                     "auto": True,
                 }
@@ -4519,20 +4519,12 @@ class LevelManager:
             # =========================================================================
             3: self.build_checkpoint_map3(),
 
-            # =========================================================================
-            # MAP 4: LEVEL 3 - House of Intelligence / Tiled map
-            # =========================================================================
-            4: self.build_tiled_map4(),
+            # map4 and map6 are temporarily hidden from level progression but kept in assets.
 
             # =========================================================================
             # MAP 5: LEVEL 3 Checkpoint - The Scrap Trenches
             # =========================================================================
             5: self.build_checkpoint_map5(),
-
-            # =========================================================================
-            # MAP 6: LEVEL 4 - House of Military
-            # =========================================================================
-            6: self.build_tiled_map6(),
 
             # =========================================================================
             # MAP 7: LEVEL 4 Checkpoint - Architecture Subgate

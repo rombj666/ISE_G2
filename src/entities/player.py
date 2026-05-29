@@ -41,6 +41,12 @@ class Player:
         self.vel_y = 0
         self.facing = 1
         self.on_ground = False
+        self.jump_count = 0
+        self.max_jumps = 2
+        self.jump_pressed = False
+        self.acceleration = 0.6
+        self.friction = 0.85
+        self.max_speed = PLAYER_SPEED
 
         self.hp = PLAYER_MAX_HP
         self.current_hp = PLAYER_MAX_HP
@@ -138,19 +144,38 @@ class Player:
         if keys[pygame.K_0]:
             self.switch_skill("soul_anchor")
 
-        self.vel_x = 0
+        moving_left = keys[pygame.K_a] or keys[pygame.K_LEFT]
+        moving_right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
+        jump_key_pressed = keys[pygame.K_SPACE] or keys[pygame.K_w]
 
-        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-            self.vel_x = -PLAYER_SPEED
-            self.facing = -1
+        if self.on_ground:
+            self.jump_count = 0
 
-        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            self.vel_x = PLAYER_SPEED
-            self.facing = 1
+        if not self.is_dashing:
+            if moving_left:
+                self.vel_x -= self.acceleration
+                self.facing = -1
 
-        if (keys[pygame.K_SPACE] or keys[pygame.K_w]) and self.on_ground:
-            self.vel_y = PLAYER_JUMP_SPEED
-            self.on_ground = False
+            if moving_right:
+                self.vel_x += self.acceleration
+                self.facing = 1
+
+            if not moving_left and not moving_right:
+                self.vel_x *= self.friction
+
+            self.vel_x = max(-self.max_speed, min(self.max_speed, self.vel_x))
+
+            if abs(self.vel_x) < 0.1:
+                self.vel_x = 0
+
+        if jump_key_pressed and not self.jump_pressed:
+            if self.jump_count < self.max_jumps:
+                self.vel_y = PLAYER_JUMP_SPEED
+                self.jump_count += 1
+                self.on_ground = False
+            self.jump_pressed = True
+        elif not jump_key_pressed:
+            self.jump_pressed = False
 
         if keys[pygame.K_LSHIFT] and self.dash_cooldown_timer <= 0:
             self.start_dash()
@@ -585,14 +610,17 @@ class Player:
             self.current_stamina = min(self.current_stamina, self.max_stamina)
 
     def move_x(self, platforms):
-        self.rect.x += self.vel_x
+        move_amount = int(round(self.vel_x))
+        self.rect.x += move_amount
 
         for platform in platforms:
             if self.rect.colliderect(platform):
-                if self.vel_x > 0:
+                if move_amount > 0:
                     self.rect.right = platform.left
-                elif self.vel_x < 0:
+                    self.vel_x = 0
+                elif move_amount < 0:
                     self.rect.left = platform.right
+                    self.vel_x = 0
 
     def move_y(self, platforms):
         self.rect.y += self.vel_y
@@ -604,6 +632,13 @@ class Player:
                     self.rect.bottom = platform.top
                     self.vel_y = 0
                     self.on_ground = True
+                elif self.vel_y < 0:
+                    self.rect.top = platform.bottom
+                    self.vel_y = 0
+                    self.rect.bottom = platform.top
+                    self.vel_y = 0
+                    self.on_ground = True
+                    self.jump_count = 0
                 elif self.vel_y < 0:
                     self.rect.top = platform.bottom
                     self.vel_y = 0

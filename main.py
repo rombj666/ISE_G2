@@ -49,6 +49,8 @@ from src.systems.skills import (
     get_skill,
 )
 from src.systems.weapons import get_weapon
+from src.ui.main_menu import MainMenu
+from src.ui.pause_menu import PauseMenu
 from src.ui.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
 
 
@@ -90,10 +92,12 @@ def main():
     u_was_pressed = False
     grapple_special_hitbox = None
     grapple_special_timer = 0
-    game_state = "playing"
+    game_state = "menu"
 
     
     dev_teleport = DevTeleport()
+    main_menu = MainMenu()
+    pause_menu = PauseMenu()
 
     def teleport_player_to(target):
         """Snap the player to a dev teleport target on any map."""
@@ -178,6 +182,20 @@ def main():
         nearby_door = level_manager.check_doors(player)
 
         for event in pygame.event.get():
+            if game_state == "menu":
+                if event.type == pygame.QUIT:
+                    running = False
+                else:
+                    main_menu.handle_event(event)
+                continue
+
+            if game_state == "paused":
+                if event.type == pygame.QUIT:
+                    running = False
+                else:
+                    pause_menu.handle_event(event)
+                continue
+
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -219,6 +237,11 @@ def main():
                         running = False
                     continue
 
+                if event.key == pygame.K_ESCAPE:
+                    game_state = "paused"
+                    pause_menu.reset_flags()
+                    continue
+
                 if event.key == pygame.K_F1:
                     player.toggle_unlimited_hp()
 
@@ -244,6 +267,51 @@ def main():
 
                 if shop.is_open:
                     shop.handle_key(event, player)
+
+        if game_state == "menu":
+            if main_menu.should_quit:
+                running = False
+                continue
+
+            if main_menu.should_start_game:
+                game_state = "playing"
+                main_menu.should_start_game = False
+
+            main_menu.update(dt)
+            main_menu.draw(screen)
+
+            if PIXELATE_GAME:
+                small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
+                pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                window.blit(pixel_surface, (0, 0))
+            else:
+                window.blit(screen, (0, 0))
+
+            pygame.display.flip()
+            continue
+
+        if game_state == "paused":
+            pause_menu.update(dt)
+
+            if pause_menu.should_quit:
+                running = False
+                continue
+
+            if pause_menu.should_restart:
+                pause_menu.reset_flags()
+                restart_game()
+
+            elif pause_menu.should_main_menu:
+                pause_menu.reset_flags()
+                main_menu.should_start_game = False
+                main_menu.should_quit = False
+                restart_game()
+                game_state = "menu"
+                continue
+
+            elif pause_menu.should_resume:
+                pause_menu.reset_flags()
+                game_state = "playing"
 
         current_map = level_manager.get_current_map()
         keys = pygame.key.get_pressed()
@@ -353,16 +421,18 @@ def main():
         if player.is_dead and game_state == "playing":
             game_state = "game_over"
 
-        camera.update(player.rect)
+        if game_state != "paused":
+            camera.update(player.rect)
 
         if game_state == "playing" and not shop.is_open:
             for effect in active_skill_effects:
                 effect.update(dt)
             active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
 
-        # Moon shard floats with the player even while paused (gives life to the scene).
         # Trails on the opposite side of the player's facing direction.
-        moon_shard.update(dt, player.rect, player.facing)
+        # Held still while paused with the rest of the gameplay scene.
+        if game_state != "paused":
+            moon_shard.update(dt, player.rect, player.facing)
 
         
         # Dev teleport hover highlight
@@ -448,6 +518,8 @@ def main():
             draw_popup(screen, "GAME OVER", "You were defeated.")
         elif game_state == "victory":
             draw_popup(screen, "PROTOTYPE COMPLETE", "You reached the final door.")
+        elif game_state == "paused":
+            pause_menu.draw(screen)
         if PIXELATE_GAME:
             small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
             pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
