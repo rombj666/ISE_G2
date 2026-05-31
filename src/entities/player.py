@@ -1,6 +1,8 @@
 import math
+from pathlib import Path
 
 import pygame
+from src.utils.animation import load_libresprite_animation, Animation
 
 from settings import (
     AUTO_GRAPPLE_ARC_HEIGHT,
@@ -33,20 +35,24 @@ from src.systems.skills import get_skill
 from src.systems.weapons import get_weapon
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
 class Player:
     def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, 48, 64)
+        self.rect = pygame.Rect(x, y, 48,64)
 
         self.vel_x = 0
         self.vel_y = 0
         self.facing = 1
-        self.on_ground = False
+
         self.jump_count = 0
         self.max_jumps = 2
         self.jump_pressed = False
         self.acceleration = 0.6
         self.friction = 0.85
         self.max_speed = PLAYER_SPEED
+        self.on_ground = True
 
         self.hp = PLAYER_MAX_HP
         self.current_hp = PLAYER_MAX_HP
@@ -113,6 +119,19 @@ class Player:
 
         self.l_was_pressed = False
 
+        # Animation system
+        self.animations = {}
+        self.current_animation = None           # Currently playing animation
+        self.current_action = "idle"            # Current action status
+        self.attack_hit_frame = 0               # Trigger damage at frame 0
+        self.attack_has_dealt_damage = False    # Whether damage has been caused
+        self.jump_state = "rising"
+        self.dash_start_x = 0
+        self.last_vel_x = 0
+
+        self.load_all_animations()
+        self.play_idle_animation()
+
     def handle_input(self, keys):
         if self.is_dead:
             self.vel_x = 0
@@ -168,11 +187,16 @@ class Player:
             if abs(self.vel_x) < 0.1:
                 self.vel_x = 0
 
+        if self.vel_x != 0:
+            self.last_vel_x = self.vel_x
+
         if jump_key_pressed and not self.jump_pressed:
             if self.jump_count < self.max_jumps:
                 self.vel_y = PLAYER_JUMP_SPEED
                 self.jump_count += 1
                 self.on_ground = False
+                self.current_action = None
+                self.jump_state = "rising"
             self.jump_pressed = True
         elif not jump_key_pressed:
             self.jump_pressed = False
@@ -262,6 +286,9 @@ class Player:
         if self.guard_broken_timer > 0:
             return
 
+        self.is_attacking = False
+        self.current_action = "idle"
+
         self.is_dashing = True
         self.dash_timer = PLAYER_DASH_TIME
         self.dash_cooldown_timer = PLAYER_DASH_COOLDOWN
@@ -270,17 +297,37 @@ class Player:
     def start_attack(self):
         if self.guard_broken_timer > 0:
             return
+        if self.current_action == "attack_na1":
+            return
 
         weapon = get_weapon(self.current_weapon_id)
-        self.is_attacking = True
-        self.attack_timer = 0.12
-        self.attack_cooldown_timer = weapon["cooldown"]
-        self.attack_has_hit = False
+        self.is_dashing = False
 
-        if weapon["weapon_type"] == "projectile":
-            self.should_spawn_projectile = True
+
+        anim = self.animations.get("attack_na1")
+        if anim:
+            anim.reset()
+            anim.loop = False
+            self.current_animation = anim
+            self.current_action = "attack_na1"
+            self.attack_has_hit = False
+            self.attack_cooldown_timer = weapon["cooldown"]
+            self.is_attacking = True
+
+            if weapon["weapon_type"] == "projectile":
+                self.should_spawn_projectile = True
+            else:
+                self.attack_hitbox = self.get_attack_hitbox()
         else:
-            self.attack_hitbox = self.get_attack_hitbox()
+            self.is_attacking = True
+            self.attack_timer = 0.12
+            self.attack_cooldown_timer = weapon["cooldown"]
+            self.attack_has_hit = False
+
+            if weapon["weapon_type"] == "projectile":
+                self.should_spawn_projectile = True
+            else:
+                self.attack_hitbox = self.get_attack_hitbox()
 
     def get_attack_hitbox(self):
         weapon = get_weapon(self.current_weapon_id)
@@ -562,6 +609,8 @@ class Player:
         self.move_x(platforms)
         self.move_y(platforms)
 
+        self.update_animation(dt)
+
     def update_timers(self, dt):
         self.update_skill_timers(dt)
 
@@ -598,6 +647,201 @@ class Player:
             if self.attack_timer <= 0:
                 self.is_attacking = False
 
+    def update_animation(self, dt):
+        """Update the currently playing animation with state-based logic"""
+
+        # if hasattr(self, '_debug_counter'):
+        #     self._debug_counter += 1
+        # else:
+        #     self._debug_counter = 0
+        # if self._debug_counter % 30 == 0:
+        #     print(f"on_ground: {self.on_ground}, vel_y: {self.vel_y}")
+
+        if self.is_attacking:
+            self.update_attack_animation(dt)
+        elif self.is_dashing:
+            self.update_dash_animation(dt)
+        elif not self.on_ground:
+            self.update_jump_animation(dt)
+        elif abs(self.vel_x) > 0.5:
+            self.update_walk_animation(dt)
+        else:
+            self.update_idle_animation(dt)
+
+        # print(f"Frame end - current_action: {self.current_action}")
+
+    def update_idle_animation(self, dt):
+        """Play idle animation (looping)"""
+        if self.current_action != "idle":
+            anim = self.animations.get("idle")
+            if anim:
+                anim.reset()
+                anim.loop = True
+                self.current_animation = anim
+                self.current_action = "idle"
+
+        if self.current_animation:
+            self.current_animation.update(dt)
+
+
+    def update_walk_animation(self, dt):
+        """Play walking animation (looping) - facing handled in draw()"""
+        if self.is_attacking:
+            return
+
+        if self.current_action != "walk":
+            anim = self.animations.get("walk")
+            if anim:
+                anim.reset()
+                anim.loop = True
+                self.current_animation = anim
+                self.current_action = "walk"
+
+        if self.current_animation:
+            self.current_animation.update(dt)
+
+    def update_jump_animation(self, dt):
+        """
+        Jump animation frame control:
+        Frame 0: Crouch/prepare (rising start)
+        Frame 1: Rising (vel_y < 0)
+        Frame 2: Falling (vel_y > 0)
+        Frame 3: Landing (only when on_ground becomes True)
+        """
+
+        self._idle_playing = False
+        anim = self.animations.get("jump")
+        if not anim:
+            return
+
+        if not hasattr(self, 'jump_state'):
+            self.jump_state = "rising"
+
+        # Start jump animation if not already playing
+        if self.current_action != "jump":
+            anim.reset()
+            anim.loop = False
+            self.current_animation = anim
+            self.current_action = "jump"
+            self.jump_state = "rising"
+
+        # Control frame based on jump state
+        if self.current_animation:
+            if self.vel_y < 0:
+                self.jump_state = "rising"
+            elif self.vel_y > 0 and self.jump_state != "falling":
+                # Switch to falling state
+                self.jump_state = "falling"
+                self.current_animation.current_frame = 2
+            elif self.jump_state == "falling" and self.on_ground:
+                # Landing - go to frame 3 then idle
+                self.jump_state = "landing"
+                self.current_animation.current_frame = 3
+            elif self.jump_state == "rising":
+                # Rising - stay at frame 1
+                if self.current_animation.current_frame < 1:
+                    self.current_animation.current_frame = 1
+                self.current_animation.current_frame = min(self.current_animation.current_frame, 1)
+            elif self.jump_state == "falling":
+                # Falling - stay at frame 2
+                if self.current_animation.current_frame < 2:
+                    self.current_animation.current_frame = 2
+                self.current_animation.current_frame = min(self.current_animation.current_frame, 2)
+            elif self.jump_state == "landing":
+                # Landing - wait for animation to finish then go to idle
+                self.current_animation.update(dt)
+                if self.current_animation.finished or self.current_animation.current_frame >= 3:
+                    self.play_idle_animation()
+                    self.jump_state = "rising"
+                return
+
+            # Update animation timer
+            self.current_animation.timer += dt
+            if self.current_animation.timer >= self.current_animation.duration_per_frame:
+                self.current_animation.timer = 0
+                # Only auto-advance frames for rising/falling if not manually controlled
+                if self.jump_state == "rising" and self.current_animation.current_frame < 1:
+                    self.current_animation.current_frame = min(self.current_animation.current_frame + 1, 1)
+                elif self.jump_state == "falling" and self.current_animation.current_frame < 2:
+                    self.current_animation.current_frame = min(self.current_animation.current_frame + 1, 2)
+
+
+    def update_dash_animation(self, dt):
+        """
+        Dash animation: play frames 0,1,2 during dash movement,
+        frame 3 at the end of dash, then back to idle/walk.
+        """
+        anim = self.animations.get("dash")
+        if not anim:
+            return
+
+        # Start dash animation if not already playing
+        if self.current_action != "dash":
+            anim.reset()
+            anim.loop = False
+            self.current_animation = anim
+            self.current_action = "dash"
+            self.dash_start_x = self.rect.x
+
+        if self.current_animation:
+            # During dash, play frames 0,1,2
+            if self.is_dashing:
+                # Force frame to advance based on dash progress
+                dash_progress = 1.0 - (self.dash_timer / PLAYER_DASH_TIME)
+                frame_index = min(int(dash_progress * 3), 2)  # 0, 1, or 2
+                self.current_animation.current_frame = frame_index
+                self.current_animation.update(dt)  # Still update timer but frame is forced
+            else:
+                # Dash finished - go to frame 3 then switch to idle/walk
+                if self.current_animation.current_frame < 3:
+                    self.current_animation.current_frame = 3
+                self.current_animation.update(dt)
+                if self.current_animation.finished or self.current_animation.current_frame >= 3:
+                    # Dash animation complete, return to idle or walk
+                    if abs(self.vel_x) > 0.5 and self.on_ground:
+                        # Start walking animation
+                        self.update_walk_animation(dt)
+                    else:
+                        self.play_idle_animation()
+
+    def update_attack_animation(self, dt):
+        """Update attack animation (non-looping)"""
+        anim = self.current_animation
+        if anim:
+            anim.update(dt)
+
+            # Trigger damage on hit frame
+            if (not self.attack_has_hit and
+                anim.current_frame >= self.attack_hit_frame):
+                self.attack_has_hit = True
+
+            # When animation finishes, go back to idle/walk
+            if anim.finished:
+                self.is_attacking = False
+                if abs(self.vel_x) > 0.5 and self.on_ground:
+                    self.update_walk_animation(dt)
+                else:
+                    self.play_idle_animation()
+
+    def play_idle_animation(self):
+
+        if self.current_action == "idle" and self.current_animation and not self.current_animation.finished:
+            return
+
+        anim = self.animations.get("idle")
+        if anim:
+            anim.reset()
+            anim.loop = True
+            anim.playing = True
+            anim.finished = False
+            self.current_animation = anim
+            self.current_action = "idle"
+            self.is_attacking = False
+            self.attack_has_hit = False
+        else:
+            self.current_animation = None
+            self.current_action = "idle"
+
     def recover_stamina(self, dt):
         if self.is_blocking:
             return
@@ -613,37 +857,56 @@ class Player:
         move_amount = int(round(self.vel_x))
         self.rect.x += move_amount
 
-        for platform in platforms:
-            if self.rect.colliderect(platform):
-                if move_amount > 0:
-                    self.rect.right = platform.left
-                    self.vel_x = 0
-                elif move_amount < 0:
-                    self.rect.left = platform.right
-                    self.vel_x = 0
+        # for platform in platforms:
+        #     if self.rect.colliderect(platform):
+        #         if move_amount > 0:
+        #             self.rect.right = platform.left
+        #             self.vel_x = 0
+        #         elif move_amount < 0:
+        #             self.rect.left = platform.right
+        #             self.vel_x = 0
 
     def move_y(self, platforms):
         self.rect.y += self.vel_y
         self.on_ground = False
 
         for platform in platforms:
-            if self.rect.colliderect(platform):
-                if self.vel_y > 0:
-                    self.rect.bottom = platform.top
-                    self.vel_y = 0
-                    self.on_ground = True
-                elif self.vel_y < 0:
-                    self.rect.top = platform.bottom
-                    self.vel_y = 0
+            if self.rect.colliderect(platform) or (
+                self.vel_y >= 0 and
+                abs(self.rect.bottom - platform.top) <= 3 and
+                self.rect.right > platform.left + 5 and
+                self.rect.left < platform.right - 5
+            ):
+                if self.vel_y >= 0:
                     self.rect.bottom = platform.top
                     self.vel_y = 0
                     self.on_ground = True
                     self.jump_count = 0
+                    break
                 elif self.vel_y < 0:
                     self.rect.top = platform.bottom
                     self.vel_y = 0
+                    break
 
     def draw(self, screen, camera=None):
+        if self.current_animation:
+            frame = self.current_animation.get_frame()
+            if frame:
+                draw_rect = self.rect
+                if camera:
+                    draw_rect = camera.apply_rect(self.rect)
+
+                if self.facing == -1:
+                    frame = pygame.transform.flip(frame, True, False)
+
+                screen.blit(frame, (draw_rect.x, draw_rect.y))
+
+                if self.is_blocking:
+                    self.draw_block_effect(screen, camera)
+                if self.is_parrying:
+                    self.draw_parry_effect(screen, camera)
+                return
+
         if self.guard_broken_timer > 0:
             color = (255, 180, 80)
         elif self.invincible_timer > 0:
@@ -802,3 +1065,71 @@ class Player:
             parry_rect = camera.apply_rect(parry_rect)
 
         pygame.draw.rect(screen, (255, 255, 120), parry_rect, 2)
+
+    def load_animation(self, animation_name, json_path, png_path, scale=1):
+        """Load an animation"""
+        json_path = PROJECT_ROOT / json_path
+        png_path = PROJECT_ROOT / png_path
+        anim = load_libresprite_animation(json_path, png_path, scale)
+        if anim:
+            self.animations[animation_name] = anim
+            print(f"Loaded animation: {animation_name}")
+        return anim
+
+    def load_all_animations(self):
+        """Load all animations"""
+        # Idle animation (looping)
+        self.load_animation(
+            "idle",
+            "assets/animations/idle_withoutweapon.json",
+            "assets/animations/idle_withoutweapon.png",
+            scale=0.75
+        )
+
+        # Walk animation (looping)
+        self.load_animation(
+            "walk",
+            "assets/animations/walk_withoutweapon.json",
+            "assets/animations/walk_withoutweapon.png",
+            scale=0.75
+        )
+
+        # # Walk right animation (looping)
+        # self.load_animation(
+        #     "walk_right",
+        #     "assets/animations/rightwalk_withoutweapon.json",
+        #     "assets/animations/rightwalk_withoutweapon.png",
+        #     scale=0.75
+        # )
+
+        # # Walk left animation (looping)
+        # self.load_animation(
+        #     "walk_left",
+        #     "assets/animations/leftwalk_withoutweapon.json",
+        #     "assets/animations/leftwalk_withoutweapon.png",
+        #     scale=0.75
+        # )
+
+        # Jump animation (4 frames, non-looping, frame-controlled)
+        self.load_animation(
+            "jump",
+            "assets/animations/jump_withoutweapon.json",
+            "assets/animations/jump_withoutweapon.png",
+            scale=0.75
+        )
+
+        # Dash animation (4 frames, non-looping)
+        self.load_animation(
+            "dash",
+            "assets/animations/dash_withoutweapon.json",
+            "assets/animations/dash_withoutweapon.png",
+            scale=0.75
+        )
+
+        # Normal attack animation
+        self.load_animation(
+            "attack_na1",
+            "assets/animations/NA1.json",
+            "assets/animations/NA1.png",
+            scale=0.75
+        )

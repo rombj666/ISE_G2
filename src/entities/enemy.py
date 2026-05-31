@@ -43,6 +43,8 @@ class Enemy:
         if not self.active or not self.alive:
             return
 
+        print(f"Enemy took {amount} damage, HP: {self.current_hp - amount} -> {self.current_hp}")  
+        
         self.current_hp -= amount
         self.hurt_timer = 0.12
 

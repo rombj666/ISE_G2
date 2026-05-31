@@ -1,6 +1,6 @@
+import csv
 import math
 from pathlib import Path
-
 import pygame
 
 from settings import (
@@ -24,9 +24,12 @@ from settings import (
     MAP_8_HEIGHT,
     MAP_8_WIDTH,
     SCREEN_HEIGHT,
+    SCREEN_WIDTH,
 )
 from src.levels.game_map import GameMap
 from src.levels.tiled_map_loader import load_tiled_map
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def draw_pixel_stone_face(screen, rect, top_color, face_color, dark_color, glow_color):
     """
@@ -358,364 +361,6 @@ def draw_body_pile(screen, camera, x, y):
     pygame.draw.rect(screen, moon_glow, apply_rect(pygame.Rect(x + 18, y - 66, 8, 3)))
     pygame.draw.circle(screen, moon_glow, apply_pos((x + 7, y - 70)), 3)
 
-def draw_level1_structures(screen, camera):
-    """
-    Big readable structures for Level 1.
-    These make platforms look attached to buildings, roads, tram wrecks,
-    balconies, bridges, and lab walls.
-    Decoration only. No collision.
-    """
-
-    def apply_rect(rect):
-        shifted_rect = pygame.Rect(rect.x + 4000, rect.y, rect.width, rect.height)
-        if camera is not None:
-            return camera.apply_rect(shifted_rect)
-        return shifted_rect
-
-    def apply_pos(pos):
-        shifted_pos = (pos[0] + 4000, pos[1])
-        if camera is not None:
-            return camera.apply_pos(shifted_pos)
-        return shifted_pos
-
-    wall_back = (22, 25, 38)
-    wall_mid = (36, 41, 58)
-    wall_light = (58, 64, 82)
-    metal = (72, 78, 96)
-    dark = (10, 12, 20)
-    glass = (42, 95, 125)
-    glow = (90, 190, 240)
-    warning = (210, 150, 70)
-
-    # =====================================================
-    # SECTION A: Body Pile & The Long Street (0 - 1500px)
-    # Open Sky. Kael wakes up on ruined street ground.
-    # Platforms are ROAD SLABS, not floating bars.
-    # Every upper platform has a wall mass below it.
-    # =====================================================
-
-    # Main long ground — the street itself
-    pygame.Rect(0, 650, 1500, 70),
-
-    # Road slab 1: a broken chunk of raised pavement
-    # Sits on top of the ground, not floating
-    pygame.Rect(280, 612, 200, 38),    # low slab, hugs ground
-
-    # Road slab 2: slightly higher, attached to a ruined wall section
-    pygame.Rect(560, 575, 220, 38),    # mid slab
-
-    # Road slab 3: higher broken road chunk
-    pygame.Rect(900, 535, 200, 38),    # upper slab
-
-    # Road slab 4: connector step before Section B gap
-    pygame.Rect(1220, 570, 180, 38),   # descends back down
-
-    # =====================================================
-    # SECTION B: Destroyed Street (1500 - 4000px)
-    # Two ground islands with a real gap between them.
-    # Upper route uses ruined building FLOORS, not random bars.
-    # =====================================================
-
-    # Ground island 1 — right after the first gap
-    pygame.Rect(1580, 650, 500, 70),
-
-    # Ruined building floor 1 — low, attached to island wall
-    pygame.Rect(1620, 600, 200, 38),
-
-    # Ruined building floor 2 — steps up
-    pygame.Rect(1900, 550, 220, 38),
-
-    # Ruined building floor 3 — near top, like a broken 2nd storey
-    pygame.Rect(2150, 490, 200, 38),
-
-    # Ground island 2 — after a bigger traversal gap
-    pygame.Rect(2450, 650, 1600, 70),
-
-    # Stepping stones leading toward the Ruined Building interior
-    # These are ROAD DEBRIS chunks, not abstract platforms
-    pygame.Rect(2580, 600, 180, 38),
-    pygame.Rect(2860, 545, 200, 38),
-    pygame.Rect(3180, 490, 180, 38),
-    pygame.Rect(3480, 545, 160, 38),
-
-    # =====================================================
-    # SECTION C: Collapsed Transit / Tram Route
-    # =====================================================
-    pygame.Rect(1580, 650, 650, 70),
-
-    pygame.Rect(1650, 610, 180, 30),
-    pygame.Rect(1860, 565, 200, 30),
-    pygame.Rect(2080, 520, 180, 30),
-
-    # =====================================================
-    # SECTION D: Cracked Observatory Plaza
-    # Observatory frame behind the plaza.
-    # =====================================================
-    pygame.draw.circle(screen, wall_mid, apply_pos((2220, 585)), 130, 14)
-    pygame.draw.circle(screen, wall_back, apply_pos((2220, 585)), 92, 8)
-
-    # broken telescope
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(2140, 505, 145, 20)))
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(2205, 525, 18, 80)))
-    pygame.draw.circle(screen, glow, apply_pos((2295, 515)), 9)
-
-    # supports for observatory balcony
-    pygame.draw.rect(screen, wall_light, apply_rect(pygame.Rect(2110, 570, 24, 80)))
-    pygame.draw.rect(screen, wall_light, apply_rect(pygame.Rect(2320, 570, 24, 80)))
-
-    # =====================================================
-    # SECTION E: House of Science Exterior
-    # Large lab wall behind balconies/walkways.
-    # =====================================================
-    pygame.draw.rect(screen, wall_mid, apply_rect(pygame.Rect(2640, 370, 700, 280)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(2640, 370, 700, 280)), 5)
-
-    # lab windows/panels
-    for wx in [2700, 2820, 2940, 3060, 3180]:
-        pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(wx, 420, 54, 60)))
-        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(wx + 8, 430, 28, 4)))
-        pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(wx, 525, 54, 60)))
-
-    # pipes
-    # for px in [2780, 3040, 3260]:
-    #     pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(px, 385, 10, 265)))
-    #     pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(px - 4, 505, 18, 4)))
-
-    # balcony support
-    pygame.draw.rect(screen, wall_light, apply_rect(pygame.Rect(2880, 585, 260, 65)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(2880, 585, 260, 65)), 3)
-
-    # =====================================================
-    # SECTION F: First Combat Courtyard
-    # Wide courtyard wall and pillars.
-    # =====================================================
-    pygame.draw.rect(screen, wall_mid, apply_rect(pygame.Rect(3340, 440, 700, 210)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(3340, 440, 700, 210)), 5)
-
-    # large pillars
-    for px in [3420, 3900]:
-        pygame.draw.rect(screen, wall_light, apply_rect(pygame.Rect(px, 515, 52, 135)))
-        pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(px, 515, 52, 135)), 3)
-
-    # balcony wall under upper platform
-    pygame.draw.rect(screen, wall_light, apply_rect(pygame.Rect(3520, 575, 300, 75)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(3520, 575, 300, 75)), 3)
-
-    # =====================================================
-    # SECTION G: Fallen Research Tower
-    # Tower mass supporting vertical platforms.
-    # =====================================================
-    tower_blocks = [
-        pygame.Rect(4100, 560, 220, 90),
-        pygame.Rect(4250, 505, 230, 145),
-        pygame.Rect(4400, 450, 230, 200),
-    ]
-
-    for block in tower_blocks:
-        pygame.draw.rect(screen, wall_mid, apply_rect(block))
-        pygame.draw.rect(screen, wall_back, apply_rect(block), 4)
-
-    # broken antenna/device
-    pygame.draw.line(screen, metal, apply_pos((4550, 445)), apply_pos((4610, 365)), 5)
-    pygame.draw.circle(screen, glow, apply_pos((4615, 360)), 8)
-
-    # =====================================================
-    # SECTION H: Lab Entrance + SHOP Area
-    # Big lab doorway and supply zone.
-    # =====================================================
-    pygame.draw.rect(screen, wall_mid, apply_rect(pygame.Rect(4620, 440, 520, 210)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(4620, 440, 520, 210)), 5)
-
-    # lab entrance door
-    pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(4665, 520, 120, 130)))
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(4665, 520, 120, 130)), 4)
-    pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(4685, 540, 80, 5)))
-
-    # SHOP structure/sign
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(4785, 500, 120, 30)))
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(4810, 512, 62, 4)))
-
-    # upper lab walkway support
-    pygame.draw.rect(screen, wall_light, apply_rect(pygame.Rect(4860, 585, 230, 65)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(4860, 585, 230, 65)), 3)
-
-    # =====================================================
-    # SECTION I: Collapsed City Route
-    # Bridge supports and final rest gate.
-    # =====================================================
-    for bx in [5220, 5420]:
-        pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(bx + 35, 585, 12, 65)))
-        pygame.draw.line(screen, metal, apply_pos((bx + 35, 620)), apply_pos((bx + 130, 650)), 4)
-        pygame.draw.line(screen, metal, apply_pos((bx + 130, 620)), apply_pos((bx + 35, 650)), 4)
-
-    # final rest-area entrance
-    pygame.draw.rect(screen, wall_mid, apply_rect(pygame.Rect(5400, 470, 190, 180)))
-    pygame.draw.rect(screen, wall_back, apply_rect(pygame.Rect(5400, 470, 190, 180)), 5)
-    pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(5460, 540, 80, 110)))
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(5425, 500, 130, 6)))
-
-def draw_level1_props(screen, camera):
-    """
-    Draws section-specific props for Level 1.
-    These are visual decorations only.
-    They help the map feel like a ruined city/science district instead of empty platforms.
-    """
-
-    def apply_rect(rect):
-        shifted_rect = pygame.Rect(rect.x + 4000, rect.y, rect.width, rect.height)
-        if camera is not None:
-            return camera.apply_rect(shifted_rect)
-        return shifted_rect
-
-    def apply_pos(pos):
-        shifted_pos = (pos[0] + 4000, pos[1])
-        if camera is not None:
-            return camera.apply_pos(shifted_pos)
-        return shifted_pos
-
-    dark = (16, 18, 26)
-    metal = (75, 82, 100)
-    metal_dark = (45, 50, 65)
-    stone = (68, 70, 84)
-    glow = (90, 200, 245)
-    blood = (85, 25, 32)
-    warning = (220, 160, 70)
-    glass = (70, 150, 190)
-
-    # =====================================================
-    # SECTION A: Body pile outside / street damage
-    # =====================================================
-
-    # cracked road marks near start
-    for x in [90, 180, 320, 430]:
-        pygame.draw.line(screen, dark, apply_pos((x, 642)), apply_pos((x + 30, 650)), 3)
-        pygame.draw.line(screen, dark, apply_pos((x + 18, 646)), apply_pos((x + 10, 655)), 2)
-
-    # broken science sign on ground
-    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(360, 625, 90, 16)))
-    pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(370, 630, 38, 3)))
-
-    # small blood trail leading away from body pile
-    pygame.draw.rect(screen, blood, apply_rect(pygame.Rect(210, 640, 22, 4)))
-    pygame.draw.rect(screen, blood, apply_rect(pygame.Rect(250, 645, 16, 3)))
-    pygame.draw.rect(screen, blood, apply_rect(pygame.Rect(285, 638, 26, 4)))
-
-    # =====================================================
-    # SECTION B: Destroyed street
-    # =====================================================
-
-    # fallen street lamp
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(720, 625, 95, 6)))
-    pygame.draw.circle(screen, warning, apply_pos((820, 626)), 7)
-    pygame.draw.line(screen, metal, apply_pos((720, 625)), apply_pos((690, 650)), 4)
-
-    # rubble piles
-    for x, y in [(610, 635), (980, 635), (1080, 635)]:
-        pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x, y, 22, 10)))
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(x + 18, y + 4, 16, 8)))
-        pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(x + 5, y + 10, 28, 5)))
-
-    # broken warning board
-    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(1030, 575, 70, 34)))
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(1040, 586, 42, 5)))
-    pygame.draw.line(screen, dark, apply_pos((1095, 575)), apply_pos((1105, 609)), 3)
-
-    # =====================================================
-    # SECTION C: Lunar tram wreck
-    # =====================================================
-
-    # tram wheels
-    for x in [1310, 1430, 1550, 1670]:
-        pygame.draw.circle(screen, dark, apply_pos((x, 650)), 14)
-        pygame.draw.circle(screen, metal, apply_pos((x, 650)), 6)
-
-    # sparking cable on tram
-    pygame.draw.line(screen, metal, apply_pos((1360, 590)), apply_pos((1460, 610)), 3)
-    pygame.draw.line(screen, glow, apply_pos((1455, 608)), apply_pos((1480, 595)), 2)
-
-    # broken glass pieces
-    for x in [1285, 1340, 1610, 1695]:
-        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(x, 635, 12, 3)))
-
-    # =====================================================
-    # SECTION D: Observatory plaza
-    # =====================================================
-
-    # cracked moon symbol on ground
-    pygame.draw.circle(screen, metal_dark, apply_pos((2050, 640)), 42, 3)
-    pygame.draw.line(screen, glow, apply_pos((2015, 640)), apply_pos((2085, 640)), 2)
-    pygame.draw.line(screen, glow, apply_pos((2050, 605)), apply_pos((2050, 675)), 2)
-    pygame.draw.line(screen, dark, apply_pos((2030, 625)), apply_pos((2065, 655)), 3)
-
-    # fallen telescope parts
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(2180, 626, 90, 12)))
-    pygame.draw.circle(screen, glass, apply_pos((2275, 632)), 9)
-
-    # =====================================================
-    # SECTION E/F: Science district exterior + combat courtyard
-    # =====================================================
-
-    # lab panels and pipes
-    for x in [2580, 2740, 2920, 3090]:
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(x, 622, 70, 22)))
-        pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(x + 10, 630, 35, 4)))
-
-    # warning floor stains / lunar burns
-    for x in [3150, 3330, 3520]:
-        pygame.draw.rect(screen, blood, apply_rect(pygame.Rect(x, 640, 34, 4)))
-        pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(x + 8, 635, 18, 2)))
-
-    # broken pillar chunks
-    for x in [3060, 3600]:
-        pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x, 610, 38, 40)))
-        pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(x + 6, 620, 24, 6)))
-
-    # =====================================================
-    # SECTION G: Fallen research tower
-    # =====================================================
-
-    # fallen antenna pieces
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(3860, 630, 120, 5)))
-    pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(3975, 610, 80, 5)))
-    pygame.draw.circle(screen, glow, apply_pos((4058, 612)), 5)
-
-    # broken experiment containers
-    for x in [3780, 4140]:
-        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(x, 615, 26, 32)))
-        pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(x + 5, 622, 16, 4)))
-
-    # =====================================================
-    # SECTION H: Lab entrance + SHOP area
-    # =====================================================
-
-    # supply crates near shop
-    for x in [4385, 4620, 4670]:
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(x, 620, 42, 30)))
-        pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(x + 5, 626, 32, 4)))
-        pygame.draw.line(screen, dark, apply_pos((x, 635)), apply_pos((x + 42, 635)), 2)
-
-    # hanging wire near lab entrance
-    pygame.draw.line(screen, metal, apply_pos((4300, 480)), apply_pos((4380, 520)), 3)
-    pygame.draw.line(screen, metal, apply_pos((4380, 520)), apply_pos((4460, 500)), 3)
-
-    # small shop arrow/light
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(4460, 488, 70, 8)))
-    pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(4480, 498, 28, 4)))
-
-    # =====================================================
-    # SECTION I: Collapsed city route / rest entrance
-    # =====================================================
-
-    # bridge debris
-    for x in [4860, 5010, 5200, 5370]:
-        pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x, 635, 35, 12)))
-        pygame.draw.rect(screen, dark, apply_rect(pygame.Rect(x + 6, 642, 25, 5)))
-
-    # rest entrance marker lights
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(5405, 520, 18, 40)))
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(5500, 520, 18, 40)))
-    pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(5420, 500, 78, 4)))
-
 def draw_moon_background(screen, camera, game_map):
     """
     Draws a simple moon-themed background.
@@ -797,88 +442,90 @@ def draw_moon_background(screen, camera, game_map):
     fog.fill((80, 95, 130, 32))
     screen.blit(fog, (0, screen_height - 170))
 
-def draw_level1_platform_backings(screen, camera, game_map):
+def draw_level1_room_shells(screen, camera, game_map):
     """
-    Draws thick wall/body support under upper platforms.
-    This makes ledges look like broken building floors instead of floating bars.
-    No thin support lines.
+    For each ceiling: draws the dark void above + the wallpaper (stone interior fill)
+    DOWN ONLY as far as the side walls extend. The strip below the wall bottom is left
+    clear so the doorway shows the moon background through it = visually obvious entry.
     """
-
     def apply_rect(rect):
         if camera is not None:
             return camera.apply_rect(rect)
         return rect
 
-    wall = (33, 38, 56)
-    wall_dark = (18, 21, 32)
-    window = (8, 10, 18)
+    void_color = (14, 17, 26)
+    trim = (72, 82, 112)
+    wallpaper = (26, 30, 46)
+    wallpaper_joint = (16, 19, 30)
 
-    ground_y = 650
+    tower_fill = (28, 32, 46)
+    tower_dark = (18, 21, 32)
+    tower_window = (8, 10, 18)
 
-    for platform in game_map.platforms:
-        # Only support upper/mid platforms, not main ground
-        if platform.y >= 635:
+    # === First pass: enclosed rooms (ceiling + walls) get void + wallpaper ===
+    handled_rects = set()
+    for plat in game_map.platforms:
+        if plat.y < 320 and plat.height <= 50 and plat.width >= 200:
+            ceiling_bottom = plat.y + plat.height
+            wall_bottom = None
+            for w in game_map.platforms:
+                if (w.height >= 150 and w.width <= 80
+                        and plat.x <= w.x and w.right <= plat.right
+                        and w.y >= ceiling_bottom):
+                    wall_bottom = w.bottom if wall_bottom is None else max(wall_bottom, w.bottom)
+            if wall_bottom is None:
+                continue   # not an enclosed room — handled in second pass
+
+            handled_rects.add(id(plat))
+
+            # Dark void above ceiling
+            void = pygame.Rect(plat.x, plat.y - 400, plat.width, 400 + plat.height)
+            pygame.draw.rect(screen, void_color, apply_rect(void))
+            pygame.draw.rect(screen, trim, apply_rect(pygame.Rect(plat.x, plat.y - 4, plat.width, 4)))
+
+            # Wallpaper — stone fill only between ceiling and wall.bottom
+            interior_h = wall_bottom - ceiling_bottom
+            if interior_h > 0:
+                interior = pygame.Rect(plat.x, ceiling_bottom, plat.width, interior_h)
+                pygame.draw.rect(screen, wallpaper, apply_rect(interior))
+                for jy in range(ceiling_bottom + 35, wall_bottom, 50):
+                    pygame.draw.rect(screen, wallpaper_joint, apply_rect(pygame.Rect(plat.x, jy, plat.width, 2)))
+
+    # === Second pass: stacked outdoor slabs (rubble towers) get a tower fill ===
+    # Group platforms by horizontal overlap. If 2+ platforms share x range and are
+    # stacked vertically, draw a stone-tower background spanning their combined extent.
+    candidates = [p for p in game_map.platforms
+                  if p.width >= 100 and p.height <= 50 and p.bottom < 650 and id(p) not in handled_rects]
+    used = set()
+    for p in candidates:
+        if id(p) in used:
             continue
-
-        # Ignore very small connector steps
-        if platform.width < 120:
+        group = [p]
+        for q in candidates:
+            if id(q) in used or q is p:
+                continue
+            # Same x range (within 20px tolerance on each side)
+            if abs(q.x - p.x) <= 20 and abs(q.right - p.right) <= 20:
+                group.append(q)
+        if len(group) < 2:
             continue
-
-        # Skip ceiling slabs — drawing a column under them would fill the whole room
-        if platform.y < 260:
-            continue
-
-        # Do not draw backing for safety floor
-        if platform.height <= 20 and platform.y > 680:
-            continue
-
-        # =========================================================
-        # STRUCTURAL FIX: EXCLUSION ZONES (TRUE SCALE)
-        # =========================================================
-        is_floating_structure = False
-
-        # SECTION 4: Collapsed Transit / Tram Wreck (Pushed way back)
-        if 6000 <= platform.x <= 8000:
-            is_floating_structure = True
-
-        # SECTION 5 & 6: Lab Balconies & Courtyard Ledges
-        if 8000 <= platform.x <= 12000:
-            is_floating_structure = True
-
-        # SECTION 9: Broken Bridge Pieces
-        if 14000 <= platform.x <= 15500:
-            is_floating_structure = True
-
-        # If it's a vehicle or bridge, skip drawing the solid wall backing!
-        if is_floating_structure:
-            continue
-
-        # =========================================================
-
-        backing_height = ground_y - platform.bottom
-
-        # If platform is too close to ground, no need for backing
-        if backing_height < 35:
-            continue
-
-        backing = pygame.Rect(
-            platform.x,
-            platform.bottom,
-            platform.width,
-            backing_height
-        )
-
-        pygame.draw.rect(screen, wall, apply_rect(backing))
-        pygame.draw.rect(screen, wall_dark, apply_rect(backing), 3)
-
-        # Add simple dark window/panel holes so it looks like a building chunk
-        if backing.height > 70:
-            for x in range(backing.x + 30, backing.right - 30, 90):
-                pygame.draw.rect(
-                    screen,
-                    window,
-                    apply_rect(pygame.Rect(x, backing.y + 25, 26, 42))
-                )
+        for g in group:
+            used.add(id(g))
+        gx = min(g.x for g in group)
+        gright = max(g.right for g in group)
+        gtop = min(g.y for g in group)
+        gbottom = max(g.bottom for g in group)
+        # Extend the fill down to ground level so the tower meets the street
+        tower = pygame.Rect(gx, gtop, gright - gx, 650 - gtop)
+        pygame.draw.rect(screen, tower_fill, apply_rect(tower))
+        pygame.draw.rect(screen, tower_dark, apply_rect(tower), 3)
+        # Window holes — 3 columns, evenly spaced rows down the tower
+        col_count = max(1, (tower.width - 40) // 80)
+        col_step = (tower.width - 40) // max(1, col_count)
+        for row_y in range(gtop + 30, 650 - 40, 70):
+            for c in range(col_count):
+                wx = gx + 20 + c * col_step
+                pygame.draw.rect(screen, tower_window, apply_rect(pygame.Rect(wx, row_y, 30, 26)))
 
 def draw_level1_wall_masses(screen, camera, game_map=None):
     """
@@ -913,278 +560,6 @@ def draw_level1_wall_masses(screen, camera, game_map=None):
                 hole_h = block.height - 30
                 if hole_h > 10:
                     pygame.draw.rect(screen, window, apply_rect(pygame.Rect(x, block.y + 24, 36, hole_h)))
-
-def draw_section5_science_buildings(screen, camera):
-    """
-    Section 5 (x=5100-6400): Science District lab buildings.
-    Drawn BEHIND the platforms — each platform reads as a balcony sticking out
-    of its building. Buildings have window grids, antennas, and connecting cables.
-    """
-    def apply_rect(rect):
-        if camera is not None:
-            return camera.apply_rect(rect)
-        return rect
-
-    def apply_pos(pos):
-        if camera is not None:
-            return camera.apply_pos(pos)
-        return pos
-
-    # ─── Colors ────────────────────────────────────────────────────────
-    body_a       = (26, 30, 46)
-    body_b       = (34, 40, 58)
-    top_trim     = (52, 60, 82)
-    edge         = (60, 70, 92)
-    window_lit   = (95, 200, 245)
-    window_dim   = (35, 80, 130)
-    window_dark  = (12, 16, 26)
-    window_frame = (50, 60, 82)
-    antenna      = (62, 68, 86)
-    antenna_dark = (28, 32, 45)
-    antenna_red  = (255, 90, 80)
-    antenna_glow = (255, 200, 180)
-    cable        = (28, 30, 42)
-    sign_bg      = (55, 65, 90)
-    sign_text    = (200, 230, 250)
-
-    def draw_window(x, y, w=28, h=34, lit=True, has_cross=True):
-        pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(x, y, w, h)))
-        glass = window_lit if lit else window_dim
-        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(x + 3, y + 3, w - 6, h - 6)))
-        if has_cross:
-            pygame.draw.rect(screen, window_dark,
-                             apply_rect(pygame.Rect(x + (w // 2) - 1, y + 3, 2, h - 6)))
-            pygame.draw.rect(screen, window_dark,
-                             apply_rect(pygame.Rect(x + 3, y + (h // 2) - 1, w - 6, 2)))
-
-    def draw_window_grid(b, cols, rows, win_w=28, win_h=34, h_pad=22, v_pad=22):
-        avail_w = b.width - h_pad * 2 - cols * win_w
-        avail_h = b.height - v_pad * 2 - rows * win_h
-        gap_x = avail_w // max(1, cols - 1) if cols > 1 else 0
-        gap_y = avail_h // max(1, rows - 1) if rows > 1 else 0
-        for col in range(cols):
-            for row in range(rows):
-                wx = b.x + h_pad + col * (win_w + gap_x)
-                wy = b.y + v_pad + row * (win_h + gap_y)
-                lit = ((col + row * 3) % 5) != 0
-                draw_window(wx, wy, win_w, win_h, lit=lit)
-
-    def draw_building(b, body_color, top_color):
-        pygame.draw.rect(screen, body_color, apply_rect(b))
-        pygame.draw.rect(screen, top_color, apply_rect(pygame.Rect(b.x, b.y, b.width, 6)))
-        pygame.draw.rect(screen, body_a, apply_rect(pygame.Rect(b.right - 5, b.y, 5, b.height)))
-        pygame.draw.rect(screen, edge, apply_rect(pygame.Rect(b.x, b.y + 6, b.width, 2)))
-
-    # ─── Building 1 (Lab A — medium) ───────────────────────────────────
-    b1 = pygame.Rect(4970, 320, 240, 330)
-    draw_building(b1, body_a, top_trim)
-    draw_window_grid(b1, cols=3, rows=4)
-    pygame.draw.rect(screen, sign_bg, apply_rect(pygame.Rect(b1.x + 80, b1.y + 12, 80, 14)))
-    pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(b1.x + 86, b1.y + 17, 6, 4)))
-    pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(b1.x + 98, b1.y + 17, 16, 4)))
-    pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(b1.x + 120, b1.y + 17, 4, 4)))
-    # Roof vent
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b1.x + 30, b1.y - 18, 16, 18)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b1.x + 28, b1.y - 22, 20, 6)))
-
-    # ─── Building 2 (Lab B — TALL) ─────────────────────────────────────
-    b2 = pygame.Rect(5340, 150, 320, 500)
-    draw_building(b2, body_b, top_trim)
-    draw_window_grid(b2, cols=4, rows=7)
-    # Central tall antenna with cross-bars + red beacon
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b2.centerx - 3, b2.y - 70, 6, 70)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b2.centerx - 16, b2.y - 60, 32, 4)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b2.centerx - 14, b2.y - 45, 28, 4)))
-    pygame.draw.circle(screen, antenna_red, apply_pos((b2.centerx, b2.y - 70)), 3)
-    pygame.draw.circle(screen, antenna_glow, apply_pos((b2.centerx, b2.y - 70)), 1)
-    # Side antenna
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b2.right - 50, b2.y - 36, 4, 36)))
-    pygame.draw.circle(screen, antenna_red, apply_pos((b2.right - 48, b2.y - 36)), 2)
-    # Roof access door
-    pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(b2.x + 40, b2.y - 22, 28, 22)))
-    pygame.draw.rect(screen, edge, apply_rect(pygame.Rect(b2.x + 40, b2.y - 22, 28, 22)), 1)
-
-    # ─── Building 3 (medium-tall) ──────────────────────────────────────
-    b3 = pygame.Rect(5760, 200, 280, 450)
-    draw_building(b3, body_a, top_trim)
-    draw_window_grid(b3, cols=4, rows=6)
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b3.x + 50, b3.y - 32, 12, 32)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b3.x + 46, b3.y - 36, 20, 6)))
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b3.right - 60, b3.y - 26, 12, 26)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b3.right - 64, b3.y - 30, 20, 6)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b3.x + 100, b3.y, 30, 8)))
-
-    # ─── Building 4 (Lab D — TALLEST) ──────────────────────────────────
-    b4 = pygame.Rect(6160, 100, 280, 550)
-    draw_building(b4, body_b, top_trim)
-    draw_window_grid(b4, cols=4, rows=8)
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b4.x + 40, b4.y - 80, 4, 80)))
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b4.x + 130, b4.y - 60, 6, 60)))
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b4.x + 220, b4.y - 70, 4, 70)))
-    pygame.draw.circle(screen, antenna_red, apply_pos((b4.x + 42, b4.y - 80)), 2)
-    pygame.draw.circle(screen, antenna_red, apply_pos((b4.x + 133, b4.y - 60)), 3)
-    pygame.draw.circle(screen, antenna_glow, apply_pos((b4.x + 133, b4.y - 60)), 1)
-    pygame.draw.circle(screen, antenna_red, apply_pos((b4.x + 222, b4.y - 70)), 2)
-    pygame.draw.line(screen, cable, apply_pos((b4.x + 42, b4.y - 80)),
-                     apply_pos((b4.x + 133, b4.y - 60)), 1)
-
-    # ─── Building 5 (medium) ───────────────────────────────────────────
-    b5 = pygame.Rect(6560, 180, 240, 470)
-    draw_building(b5, body_a, top_trim)
-    draw_window_grid(b5, cols=3, rows=7)
-    # Satellite dish
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b5.centerx - 2, b5.y - 38, 4, 38)))
-    pygame.draw.arc(screen, antenna,
-                    apply_rect(pygame.Rect(b5.centerx - 26, b5.y - 60, 52, 42)),
-                    3.14, 6.28, 5)
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b5.centerx - 4, b5.y - 50, 8, 12)))
-    # Chimney
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b5.x + 30, b5.y - 20, 18, 20)))
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b5.x + 28, b5.y - 24, 22, 6)))
-
-    # ─── Connecting cables between buildings ───────────────────────────
-    pygame.draw.line(screen, cable, apply_pos((b1.right - 30, b1.y + 14)),
-                     apply_pos((b2.x + 30, b2.y + 60)), 2)
-    pygame.draw.line(screen, cable, apply_pos((b2.right - 30, b2.y + 80)),
-                     apply_pos((b3.x + 30, b3.y + 30)), 2)
-    pygame.draw.line(screen, cable, apply_pos((b3.right - 30, b3.y + 40)),
-                     apply_pos((b4.x + 30, b4.y + 80)), 2)
-    pygame.draw.line(screen, cable, apply_pos((b4.right - 30, b4.y + 60)),
-                     apply_pos((b5.x + 30, b5.y + 30)), 2)
-
-
-def draw_section6_courtyard_buildings(screen, camera):
-    """
-    Section 6 (x=6400-7600): First Combat Courtyard — rooftop-hopping arena.
-    Each platform is the rooftop of a building. Buildings extend from rooftop
-    DOWN to the street, with window grids + per-building decorations
-    (lantern, shed, antennas, exit spire).
-    """
-    def apply_rect(rect):
-        if camera is not None:
-            return camera.apply_rect(rect)
-        return rect
-
-    def apply_pos(pos):
-        if camera is not None:
-            return camera.apply_pos(pos)
-        return pos
-
-    # ─── Colors ────────────────────────────────────────────────────────
-    body_a       = (26, 30, 46)
-    body_b       = (34, 40, 58)
-    top_trim     = (52, 60, 82)
-    edge         = (60, 70, 92)
-    window_lit   = (95, 200, 245)
-    window_dim   = (35, 80, 130)
-    window_dark  = (12, 16, 26)
-    window_frame = (50, 60, 82)
-    antenna      = (62, 68, 86)
-    antenna_dark = (28, 32, 45)
-    antenna_red  = (255, 90, 80)
-    antenna_glow = (255, 200, 180)
-    cable        = (28, 30, 42)
-    lamp_post    = (60, 65, 80)
-    lamp_glow    = (255, 200, 80)
-    lamp_core    = (255, 240, 160)
-    shed_brown   = (90, 60, 38)
-    shed_dark    = (55, 35, 22)
-    shed_roof    = (62, 42, 28)
-    exit_marker  = (90, 230, 130)
-
-    def draw_window(x, y, w=26, h=32, lit=True):
-        pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(x, y, w, h)))
-        glass = window_lit if lit else window_dim
-        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(x + 3, y + 3, w - 6, h - 6)))
-        pygame.draw.rect(screen, window_dark,
-                         apply_rect(pygame.Rect(x + (w // 2) - 1, y + 3, 2, h - 6)))
-        pygame.draw.rect(screen, window_dark,
-                         apply_rect(pygame.Rect(x + 3, y + (h // 2) - 1, w - 6, 2)))
-
-    def draw_window_grid(b, cols, rows, win_w=26, win_h=32, h_pad=18, v_pad=22):
-        avail_w = b.width - h_pad * 2 - cols * win_w
-        avail_h = b.height - v_pad * 2 - rows * win_h
-        gap_x = avail_w // max(1, cols - 1) if cols > 1 else 0
-        gap_y = avail_h // max(1, rows - 1) if rows > 1 else 0
-        for col in range(cols):
-            for row in range(rows):
-                wx = b.x + h_pad + col * (win_w + gap_x)
-                wy = b.y + v_pad + row * (win_h + gap_y)
-                lit = ((col + row * 2) % 4) != 0
-                draw_window(wx, wy, win_w, win_h, lit=lit)
-
-    def draw_building(b, body_color, top_color):
-        pygame.draw.rect(screen, body_color, apply_rect(b))
-        pygame.draw.rect(screen, top_color, apply_rect(pygame.Rect(b.x, b.y, b.width, 6)))
-        pygame.draw.rect(screen, body_a, apply_rect(pygame.Rect(b.right - 5, b.y, 5, b.height)))
-        pygame.draw.rect(screen, edge, apply_rect(pygame.Rect(b.x, b.y + 6, b.width, 2)))
-
-    # ─── Building 1 (Rooftop A — first hop) ────────────────────────────
-    b1 = pygame.Rect(6780, 180, 130, 470)
-    draw_building(b1, body_a, top_trim)
-    draw_window_grid(b1, cols=2, rows=7)
-    # Yellow lantern on the rooftop edge
-    lamp_x = b1.x + 22
-    pygame.draw.rect(screen, lamp_post, apply_rect(pygame.Rect(lamp_x, b1.y - 26, 4, 26)))
-    pygame.draw.rect(screen, lamp_post, apply_rect(pygame.Rect(lamp_x - 7, b1.y - 30, 18, 6)))
-    pygame.draw.circle(screen, lamp_glow, apply_pos((lamp_x + 2, b1.y - 36)), 6)
-    pygame.draw.circle(screen, lamp_core, apply_pos((lamp_x + 2, b1.y - 36)), 3)
-    # Small AC unit on roof
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b1.x + 80, b1.y - 14, 26, 14)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b1.x + 80, b1.y - 14, 26, 14)), 1)
-
-    # ─── Building 2 (Tactical block 1) ─────────────────────────────────
-    b2 = pygame.Rect(6880, 200, 180, 450)
-    draw_building(b2, body_b, top_trim)
-    draw_window_grid(b2, cols=3, rows=6)
-    # Vent stack on roof
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b2.x + 40, b2.y - 20, 14, 20)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b2.x + 36, b2.y - 24, 22, 6)))
-
-    # ─── Building 3 (Step up / Tallest — main central) ─────────────────
-    b3 = pygame.Rect(7030, 150, 330, 500)
-    draw_building(b3, body_a, top_trim)
-    draw_window_grid(b3, cols=4, rows=7)
-    # Brown rooftop SHED — matches the collision rect at (7100, 100, 100, 60)
-    shed = pygame.Rect(7100, 100, 100, 60)
-    pygame.draw.rect(screen, shed_brown, apply_rect(shed))
-    pygame.draw.rect(screen, shed_roof, apply_rect(pygame.Rect(shed.x - 4, shed.y - 6, shed.width + 8, 10)))
-    pygame.draw.rect(screen, shed_dark, apply_rect(shed), 2)
-    # Shed door + window
-    pygame.draw.rect(screen, shed_dark, apply_rect(pygame.Rect(shed.x + 14, shed.y + 20, 18, 38)))
-    pygame.draw.rect(screen, (180, 150, 80), apply_rect(pygame.Rect(shed.x + 26, shed.y + 38, 4, 4)))
-    pygame.draw.rect(screen, lamp_glow, apply_rect(pygame.Rect(shed.x + 50, shed.y + 20, 22, 18)))
-    pygame.draw.rect(screen, shed_dark, apply_rect(pygame.Rect(shed.x + 50, shed.y + 20, 22, 18)), 1)
-    # Tall antenna on the right side of building 3
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(b3.right - 50, b3.y - 80, 5, 80)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b3.right - 60, b3.y - 60, 25, 4)))
-    pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(b3.right - 60, b3.y - 40, 25, 4)))
-    pygame.draw.circle(screen, antenna_red, apply_pos((b3.right - 48, b3.y - 80)), 3)
-    pygame.draw.circle(screen, antenna_glow, apply_pos((b3.right - 48, b3.y - 80)), 1)
-
-    # ─── Building 4 (Cover right / EXIT building) ──────────────────────
-    b4 = pygame.Rect(7310, 250, 150, 400)
-    draw_building(b4, body_b, top_trim)
-    draw_window_grid(b4, cols=2, rows=6)
-    # Exit marker on rooftop (green glow signals "this way out")
-    pygame.draw.rect(screen, exit_marker, apply_rect(pygame.Rect(b4.x + 60, b4.y - 12, 30, 4)))
-    pygame.draw.rect(screen, (40, 120, 70), apply_rect(pygame.Rect(b4.x + 60, b4.y - 12, 30, 4)), 1)
-    # TALL antenna SPIRE — iconic skyline element on the right side
-    spire_x = b4.right - 12
-    pygame.draw.rect(screen, antenna, apply_rect(pygame.Rect(spire_x, b4.y - 230, 5, 230)))
-    for cy in [b4.y - 200, b4.y - 160, b4.y - 120, b4.y - 80, b4.y - 40]:
-        pygame.draw.rect(screen, antenna_dark, apply_rect(pygame.Rect(spire_x - 8, cy, 21, 3)))
-    pygame.draw.circle(screen, antenna_red, apply_pos((spire_x + 2, b4.y - 230)), 4)
-    pygame.draw.circle(screen, antenna_glow, apply_pos((spire_x + 2, b4.y - 230)), 2)
-
-    # ─── Connecting cables between buildings ───────────────────────────
-    pygame.draw.line(screen, cable, apply_pos((b1.right - 20, b1.y + 30)),
-                     apply_pos((b2.x + 30, b2.y + 50)), 2)
-    pygame.draw.line(screen, cable, apply_pos((b2.right - 30, b2.y + 60)),
-                     apply_pos((b3.x + 30, b3.y + 40)), 2)
-    pygame.draw.line(screen, cable, apply_pos((b3.right - 50, b3.y + 50)),
-                     apply_pos((b4.x + 30, b4.y + 40)), 2)
-
 
 def draw_section4_tram_wreck(screen, camera):
     """
@@ -1441,547 +816,6 @@ def draw_section4_tram_wreck(screen, camera):
         pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(mx + 6, 641, 14, 4)))
     # Spilled oil / dark stain under tram 2
     pygame.draw.ellipse(screen, (15, 15, 22), apply_rect(pygame.Rect(c2x + 80, 644, 110, 8)))
-
-
-def draw_section7_lab_entrance_details(screen, camera):
-    """
-    Section 7 (x=7600-9620): Messy Lab Entrance — interior overlay details.
-    Drawn AFTER platforms so the windows, chains, signs, pipes, and lamps
-    layer on top of the platform stone visuals.
-    """
-    def apply_rect(rect):
-        if camera is not None:
-            return camera.apply_rect(rect)
-        return rect
-
-    def apply_pos(pos):
-        if camera is not None:
-            return camera.apply_pos(pos)
-        return pos
-
-    # ─── Colors ────────────────────────────────────────────────────────
-    window_lit   = (95, 200, 245)
-    window_dim   = (35, 80, 130)
-    window_dark  = (12, 16, 26)
-    window_frame = (50, 60, 82)
-    chain        = (60, 50, 40)
-    chain_link   = (88, 80, 64)
-    chain_hook   = (110, 100, 80)
-    lamp_post    = (60, 65, 80)
-    lamp_glow    = (255, 200, 80)
-    lamp_core    = (255, 240, 160)
-    lamp_dim     = (140, 110, 50)
-    danger_red   = (200, 55, 45)
-    warning_yel  = (210, 175, 60)
-    sign_bg      = (38, 44, 60)
-    sign_border  = (90, 100, 120)
-    sign_text    = (220, 235, 250)
-    pipe         = (78, 82, 96)
-    pipe_dark    = (40, 45, 60)
-    pipe_joint   = (54, 58, 72)
-    steam        = (90, 95, 110)
-    steam_light  = (130, 135, 148)
-    grate        = (45, 50, 65)
-    grate_dark   = (22, 26, 36)
-    exit_green   = (90, 230, 130)
-    exit_dim     = (40, 120, 70)
-    door_dark    = (10, 13, 22)
-    rust         = (130, 70, 40)
-
-    # ─── 1. Arch Doorway with hanging chains (x=7600-7700) ─────────────
-    # Chains hanging from the ceiling (y=230) down to the floor level (y=380).
-    # 6 chains tightly spaced — forms a "grated archway" visual.
-    chain_columns = [
-        (7610, 380), (7625, 405), (7640, 380), (7655, 412),
-        (7670, 380), (7685, 405),
-    ]
-    for cx, bot_y in chain_columns:
-        top_y = 230
-        # Hook attaching chain to ceiling
-        pygame.draw.rect(screen, chain_hook, apply_rect(pygame.Rect(cx - 4, top_y - 2, 12, 8)))
-        # Rope spine
-        pygame.draw.rect(screen, chain, apply_rect(pygame.Rect(cx, top_y, 3, bot_y - top_y)))
-        # Chain links along the spine
-        for ly in range(top_y + 10, bot_y - 4, 14):
-            pygame.draw.rect(screen, chain_link, apply_rect(pygame.Rect(cx - 3, ly, 9, 6)))
-        # Weight/hook at the bottom
-        pygame.draw.rect(screen, chain_hook, apply_rect(pygame.Rect(cx - 5, bot_y - 6, 13, 8)))
-
-    # ─── 2. Main building windows (x=7700-8300, y=380-660) ─────────────
-    # The big block at (7700, 380, 600, 280) is the lab building exterior.
-    # Draw 2 rows × 5 cols of lit lab windows on its FRONT face.
-    main_x, main_y, main_w, main_h = 7700, 380, 600, 280
-    # Top trim line
-    pygame.draw.rect(screen, sign_border, apply_rect(pygame.Rect(main_x, main_y + 8, main_w, 2)))
-    for col in range(5):
-        for row in range(2):
-            wx = main_x + 40 + col * 110
-            wy = main_y + 40 + row * 110
-            # Frame
-            pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(wx, wy, 40, 64)))
-            # Glass — alternate lit/dim
-            lit = ((col + row * 2) % 3) != 0
-            glass = window_lit if lit else window_dim
-            pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(wx + 4, wy + 4, 32, 56)))
-            # Cross mullion
-            pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 19, wy + 4, 2, 56)))
-            pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 4, wy + 31, 32, 2)))
-            # Bottom-left scientific equipment silhouette in some lit windows
-            if lit and (col + row) % 2 == 0:
-                pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 8, wy + 40, 6, 16)))
-                pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 22, wy + 36, 8, 20)))
-
-    # Big "LAB SECTOR 7 — DANGER" sign on the front
-    sg_x, sg_y = main_x + 200, main_y + 16
-    pygame.draw.rect(screen, sign_bg, apply_rect(pygame.Rect(sg_x, sg_y, 220, 20)))
-    pygame.draw.rect(screen, sign_border, apply_rect(pygame.Rect(sg_x, sg_y, 220, 20)), 1)
-    pygame.draw.rect(screen, danger_red, apply_rect(pygame.Rect(sg_x, sg_y, 220, 4)))
-    # Stylized text bars
-    for tb_x, tb_w in [(sg_x + 14, 24), (sg_x + 44, 14), (sg_x + 64, 28), (sg_x + 100, 16),
-                       (sg_x + 124, 30), (sg_x + 162, 12), (sg_x + 180, 26)]:
-        pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(tb_x, sg_y + 9, tb_w, 6)))
-
-    # ─── 3. Upper facade windows (x=7600-8300, y=0-230) ────────────────
-    # Windows in the upper wall (ceiling block facade)
-    ceiling_x, ceiling_y, ceiling_w = 7600, 0, 700
-    for col in range(6):
-        wx = ceiling_x + 40 + col * 105
-        wy = 130
-        pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(wx, wy, 34, 50)))
-        lit = (col % 2 == 0)
-        pygame.draw.rect(screen, window_lit if lit else window_dim,
-                         apply_rect(pygame.Rect(wx + 4, wy + 4, 26, 42)))
-        pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 16, wy + 4, 2, 42)))
-    # Big "LAB ENTRANCE" sign on upper facade
-    us_x, us_y = ceiling_x + 200, 50
-    pygame.draw.rect(screen, sign_bg, apply_rect(pygame.Rect(us_x, us_y, 300, 38)))
-    pygame.draw.rect(screen, sign_border, apply_rect(pygame.Rect(us_x, us_y, 300, 38)), 2)
-    pygame.draw.rect(screen, warning_yel, apply_rect(pygame.Rect(us_x, us_y, 300, 5)))
-    pygame.draw.rect(screen, danger_red, apply_rect(pygame.Rect(us_x, us_y + 33, 300, 5)))
-    # Stylized "LAB ENTRANCE" letters
-    for ltr_x in [us_x + 20, us_x + 50, us_x + 84, us_x + 120, us_x + 162, us_x + 196, us_x + 230, us_x + 264]:
-        pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(ltr_x, us_y + 14, 18, 12)))
-
-    # ─── 4. Ceiling pipes running across the corridor ──────────────────
-    # Main pipe along the ceiling (just below y=230)
-    pygame.draw.rect(screen, pipe, apply_rect(pygame.Rect(7700, 232, 1900, 8)))
-    pygame.draw.rect(screen, pipe_dark, apply_rect(pygame.Rect(7700, 240, 1900, 3)))
-    # Pipe joints every 200px
-    for jx in range(7800, 9620, 200):
-        pygame.draw.rect(screen, pipe_joint, apply_rect(pygame.Rect(jx, 228, 12, 16)))
-    # Smaller secondary pipe slightly below
-    pygame.draw.rect(screen, pipe_dark, apply_rect(pygame.Rect(7700, 258, 1900, 4)))
-
-    # ─── 5. Hanging lamps in the corridor ──────────────────────────────
-    for lx in [7780, 8050, 8400, 8650, 8920, 9100, 9320, 9520]:
-        # Cable from ceiling pipe
-        pygame.draw.rect(screen, chain, apply_rect(pygame.Rect(lx, 262, 2, 22)))
-        # Lamp body
-        pygame.draw.rect(screen, lamp_post, apply_rect(pygame.Rect(lx - 8, 284, 18, 8)))
-        pygame.draw.rect(screen, pipe_dark, apply_rect(pygame.Rect(lx - 8, 284, 18, 8)), 1)
-        # Lamp glow
-        pygame.draw.circle(screen, lamp_glow, apply_pos((lx, 296)), 5)
-        pygame.draw.circle(screen, lamp_core, apply_pos((lx, 296)), 2)
-        # Halo
-        halo = pygame.Surface((28, 28), pygame.SRCALPHA)
-        pygame.draw.circle(halo, (255, 200, 80, 40), (14, 14), 14)
-        if camera is not None:
-            screen.blit(halo, camera.apply_pos((lx - 14, 282)))
-        else:
-            screen.blit(halo, (lx - 14, 282))
-
-    # ─── 6. Bridge area: vertical chains between upper and lower segments ──
-    # Bridge segments span x=8300-8740. Chains hang between upper (y~200) and lower (y~340).
-    bridge_chain_xs = [8310, 8330, 8395, 8420, 8460, 8490, 8540, 8575, 8615, 8650, 8690, 8720]
-    for bcx in bridge_chain_xs:
-        pygame.draw.rect(screen, chain, apply_rect(pygame.Rect(bcx, 220, 2, 100)))
-        for ly in range(228, 320, 14):
-            pygame.draw.rect(screen, chain_link, apply_rect(pygame.Rect(bcx - 2, ly, 6, 5)))
-
-    # Light fixtures on the upper bridge segments (small spotlights pointing down)
-    for sx in [8330, 8480, 8620]:
-        pygame.draw.rect(screen, lamp_post, apply_rect(pygame.Rect(sx, 200, 16, 6)))
-        pygame.draw.polygon(screen, lamp_dim, [
-            apply_pos((sx + 2, 206)), apply_pos((sx + 14, 206)),
-            apply_pos((sx + 18, 240)), apply_pos((sx - 2, 240)),
-        ])
-        pygame.draw.circle(screen, lamp_glow, apply_pos((sx + 8, 210)), 3)
-
-    # ─── 7. After-bridge wall windows (x=8740-8860) ────────────────────
-    # Windows on the upper wall (8740, 0, 120, 230)
-    pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(8770, 90, 36, 56)))
-    pygame.draw.rect(screen, window_lit, apply_rect(pygame.Rect(8774, 94, 28, 48)))
-    pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(8788, 94, 2, 48)))
-    pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(8774, 117, 28, 2)))
-    # Windows on the lower wall (8740, 380, 120, 330)
-    for row in range(3):
-        wy = 410 + row * 80
-        pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(8770, wy, 36, 50)))
-        pygame.draw.rect(screen, window_lit if row != 1 else window_dim,
-                         apply_rect(pygame.Rect(8774, wy + 4, 28, 42)))
-        pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(8788, wy + 4, 2, 42)))
-
-    # ─── 8. Central pillar banner (x=9150-9180) ────────────────────────
-    # Yellow warning banner near top of pillar
-    pillar_x = 9150
-    pygame.draw.rect(screen, sign_bg, apply_rect(pygame.Rect(pillar_x - 35, 215, 100, 18)))
-    pygame.draw.rect(screen, warning_yel, apply_rect(pygame.Rect(pillar_x - 30, 219, 90, 10)))
-    # Diagonal hazard stripes
-    for hs in range(5):
-        pygame.draw.rect(screen, sign_bg,
-                         apply_rect(pygame.Rect(pillar_x - 28 + hs * 18, 219, 8, 10)))
-    # Chain hanging from top of pillar to a hook below
-    pygame.draw.rect(screen, chain, apply_rect(pygame.Rect(pillar_x + 13, 240, 2, 50)))
-    pygame.draw.rect(screen, chain_hook, apply_rect(pygame.Rect(pillar_x + 9, 285, 12, 8)))
-
-    # ─── 9. Final wall windows + EXIT sign (x=9500-9620) ───────────────
-    # Upper wall (9500, -20, 120, 200)
-    pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(9530, 60, 36, 50)))
-    pygame.draw.rect(screen, window_lit, apply_rect(pygame.Rect(9534, 64, 28, 42)))
-    pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(9548, 64, 2, 42)))
-    # Lower wall (9500, 300, 120, 550)
-    pygame.draw.rect(screen, window_frame, apply_rect(pygame.Rect(9530, 340, 36, 50)))
-    pygame.draw.rect(screen, window_lit, apply_rect(pygame.Rect(9534, 344, 28, 42)))
-    # SHOP direction sign — bright green arrow pointing right
-    arrow_x, arrow_y = 9560, 470
-    pygame.draw.rect(screen, exit_dim, apply_rect(pygame.Rect(arrow_x - 35, arrow_y - 14, 70, 28)))
-    pygame.draw.rect(screen, exit_green, apply_rect(pygame.Rect(arrow_x - 32, arrow_y - 11, 64, 22)))
-    pygame.draw.polygon(screen, sign_bg, [
-        apply_pos((arrow_x - 20, arrow_y - 6)),
-        apply_pos((arrow_x + 10, arrow_y - 6)),
-        apply_pos((arrow_x + 10, arrow_y - 12)),
-        apply_pos((arrow_x + 26, arrow_y)),
-        apply_pos((arrow_x + 10, arrow_y + 12)),
-        apply_pos((arrow_x + 10, arrow_y + 6)),
-        apply_pos((arrow_x - 20, arrow_y + 6)),
-    ])
-    # "SHOP" letters above the arrow
-    for ltr_x in [arrow_x - 24, arrow_x - 10, arrow_x + 4, arrow_x + 18]:
-        pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(ltr_x, arrow_y - 28, 10, 8)))
-
-    # ─── 10. Floor grates on the lower courtyard (y=520+) ──────────────
-    for gx in [8920, 9020, 9230, 9330, 9430]:
-        # Grate inset
-        pygame.draw.rect(screen, grate, apply_rect(pygame.Rect(gx, 522, 56, 6)))
-        # Grate slats
-        for sl in range(7):
-            pygame.draw.rect(screen, grate_dark,
-                             apply_rect(pygame.Rect(gx + 2 + sl * 8, 523, 4, 4)))
-
-    # ─── 11. Steam vents rising from floor grates ──────────────────────
-    for vx in [8945, 9255, 9455]:
-        pygame.draw.ellipse(screen, steam, apply_rect(pygame.Rect(vx, 500, 26, 14)))
-        pygame.draw.ellipse(screen, steam_light, apply_rect(pygame.Rect(vx + 4, 485, 20, 12)))
-        pygame.draw.ellipse(screen, steam, apply_rect(pygame.Rect(vx + 8, 468, 16, 10)))
-
-    # ─── 12. Small "FLOOR 1" tag on the small hanging ledge ────────────
-    pygame.draw.rect(screen, sign_bg, apply_rect(pygame.Rect(7575, 360, 38, 12)))
-    pygame.draw.rect(screen, sign_border, apply_rect(pygame.Rect(7575, 360, 38, 12)), 1)
-    pygame.draw.rect(screen, sign_text, apply_rect(pygame.Rect(7580, 364, 8, 4)))
-    pygame.draw.rect(screen, warning_yel, apply_rect(pygame.Rect(7592, 364, 16, 4)))
-
-    # ─── 13. Door silhouette on the after-bridge wall ──────────────────
-    # Small access door at the bottom of the after-bridge wall (decorative)
-    pygame.draw.rect(screen, door_dark, apply_rect(pygame.Rect(8770, 590, 32, 60)))
-    pygame.draw.rect(screen, sign_border, apply_rect(pygame.Rect(8770, 590, 32, 60)), 1)
-    pygame.draw.circle(screen, warning_yel, apply_pos((8795, 620)), 2)
-
-    # ─── 14. Rust streaks on the main building front ───────────────────
-    # Decorative rust runs down from a few windows
-    for rx in [7745, 7965, 8185]:
-        pygame.draw.rect(screen, rust, apply_rect(pygame.Rect(rx, 400, 4, 60)))
-        pygame.draw.rect(screen, (90, 50, 30), apply_rect(pygame.Rect(rx + 1, 400, 2, 60)))
-
-
-def draw_section8_collapsed_city_background(screen, camera):
-    """
-    Section 8 backdrop: collapsed city towers, snapped bridge spans, cables,
-    and a damaged lift shaft. Visual only.
-    """
-    def apply_rect(rect):
-        if camera is not None:
-            return camera.apply_rect(rect)
-        return rect
-
-    def apply_pos(pos):
-        if camera is not None:
-            return camera.apply_pos(pos)
-        return pos
-
-    void = (8, 10, 18)
-    tower_dark = (18, 22, 34)
-    tower_mid = (25, 30, 46)
-    tower_light = (42, 50, 70)
-    tower_edge = (52, 60, 82)
-    window_dark = (7, 9, 16)
-    window_blue = (38, 92, 135)
-    window_glow = (84, 190, 235)
-    metal = (76, 82, 96)
-    metal_dark = (35, 38, 50)
-    cable = (30, 32, 42)
-    warning = (212, 166, 64)
-    rust = (104, 56, 38)
-    moon_ring = (126, 136, 158)
-    moon_ring_dark = (62, 68, 84)
-
-    def draw_window_grid(building, cols, rows):
-        gap_x = max(38, building.width // max(1, cols + 1))
-        gap_y = max(54, building.height // max(1, rows + 1))
-
-        for col in range(cols):
-            for row in range(rows):
-                if (col * 3 + row * 5 + building.x // 40) % 4 == 0:
-                    continue
-
-                wx = building.x + 22 + col * gap_x
-                wy = building.y + 32 + row * gap_y + ((col + building.x // 100) % 3) * 4
-
-                if wx + 28 >= building.right or wy + 34 >= building.bottom:
-                    continue
-
-                lit = (col + row * 2 + building.width // 20) % 5 == 0
-                glass = window_glow if lit else window_blue
-                pygame.draw.rect(screen, tower_edge, apply_rect(pygame.Rect(wx, wy, 28, 34)))
-                pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(wx + 4, wy + 4, 20, 26)))
-                pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 13, wy + 4, 2, 26)))
-                pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 4, wy + 16, 20, 2)))
-
-                if (row + col) % 3 == 0:
-                    pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx + 4, wy + 18, 20, 12)))
-
-    def draw_ruined_tower(rect, color, cap_offset=0):
-        pygame.draw.rect(screen, color, apply_rect(rect))
-        pygame.draw.rect(screen, tower_light, apply_rect(pygame.Rect(rect.x, rect.y, rect.width, 7)))
-        pygame.draw.rect(screen, tower_dark, apply_rect(pygame.Rect(rect.right - 6, rect.y, 6, rect.height)))
-        pygame.draw.rect(screen, tower_edge, apply_rect(pygame.Rect(rect.x, rect.y + 7, rect.width, 2)))
-
-        roof_points = [
-            apply_pos((rect.x, rect.y)),
-            apply_pos((rect.x + rect.width // 4, rect.y - 22 + cap_offset)),
-            apply_pos((rect.x + rect.width // 2, rect.y - 5)),
-            apply_pos((rect.x + rect.width - 32, rect.y - 34 - cap_offset)),
-            apply_pos((rect.right, rect.y)),
-        ]
-        pygame.draw.polygon(screen, color, roof_points)
-        pygame.draw.line(
-            screen,
-            tower_edge,
-            apply_pos((rect.x, rect.y)),
-            apply_pos((rect.x + rect.width // 4, rect.y - 22 + cap_offset)),
-            2,
-        )
-        pygame.draw.line(
-            screen,
-            tower_edge,
-            apply_pos((rect.x + rect.width - 32, rect.y - 34 - cap_offset)),
-            apply_pos((rect.right, rect.y)),
-            2,
-        )
-        draw_window_grid(rect, max(2, rect.width // 90), max(2, rect.height // 88))
-
-    # Dark drop under the high route.
-    pygame.draw.rect(screen, void, apply_rect(pygame.Rect(9620, 360, 1880, 290)))
-
-    # Buildings that anchor the platforms as broken rooftops and bridge supports.
-    draw_ruined_tower(pygame.Rect(9740, 220, 300, 430), tower_mid, cap_offset=8)
-    draw_ruined_tower(pygame.Rect(10120, 300, 470, 350), tower_dark, cap_offset=-6)
-    draw_ruined_tower(pygame.Rect(10540, 250, 230, 400), tower_mid, cap_offset=4)
-    draw_ruined_tower(pygame.Rect(10880, 200, 310, 450), tower_dark, cap_offset=12)
-    draw_ruined_tower(pygame.Rect(11245, 160, 255, 490), tower_mid, cap_offset=-4)
-
-    # Broken bridge silhouettes behind the real platform collision.
-    bridge_spans = [
-        [(9620, 328), (9745, 310), (9820, 220), (9920, 228), (9780, 350)],
-        [(9980, 238), (10160, 320), (10560, 320), (10520, 350), (10010, 270)],
-        [(10560, 270), (10840, 312), (10780, 345), (10535, 292)],
-        [(10940, 218), (11270, 178), (11230, 210), (10980, 245)],
-    ]
-    for span in bridge_spans:
-        pygame.draw.polygon(screen, metal_dark, [apply_pos(point) for point in span])
-        pygame.draw.lines(screen, tower_light, False, [apply_pos(point) for point in span[:3]], 3)
-
-    # Snapped suspension cables.
-    cable_points = [(9640, 170), (9840, 210), (10160, 125), (10580, 245), (11040, 115), (11380, 170)]
-    for start, end in zip(cable_points, cable_points[1:]):
-        mid = ((start[0] + end[0]) // 2, max(start[1], end[1]) + 55)
-        pygame.draw.line(screen, cable, apply_pos(start), apply_pos(mid), 2)
-        pygame.draw.line(screen, cable, apply_pos(mid), apply_pos(end), 2)
-
-    for hx in [9690, 9825, 10190, 10480, 10630, 10800, 11080, 11240]:
-        top_y = 150 + (hx // 70) % 70
-        bottom_y = 250 + (hx // 50) % 95
-        pygame.draw.rect(screen, cable, apply_rect(pygame.Rect(hx, top_y, 3, bottom_y - top_y)))
-        for ly in range(top_y + 10, bottom_y - 4, 18):
-            pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(hx - 3, ly, 9, 5)))
-
-    # Cracked moon-gate machinery behind the final lift.
-    ring_center = (11275, 168)
-    pygame.draw.circle(screen, moon_ring_dark, apply_pos(ring_center), 92)
-    pygame.draw.circle(screen, moon_ring, apply_pos(ring_center), 76)
-    pygame.draw.circle(screen, (24, 28, 42), apply_pos(ring_center), 54)
-    for angle in range(0, 360, 45):
-        radians = math.radians(angle)
-        sx = ring_center[0] + int(math.cos(radians) * 62)
-        sy = ring_center[1] + int(math.sin(radians) * 62)
-        pygame.draw.rect(screen, moon_ring_dark, apply_rect(pygame.Rect(sx - 4, sy - 4, 8, 8)))
-    pygame.draw.line(screen, rust, apply_pos((11220, 104)), apply_pos((11308, 230)), 3)
-    pygame.draw.line(screen, tower_edge, apply_pos((11238, 95)), apply_pos((11208, 156)), 2)
-
-    # Lift shaft, rails, and landing bracket.
-    shaft_x = 11280
-    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(shaft_x - 18, 160, 8, 450)))
-    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(shaft_x + 228, 160, 8, 450)))
-    for y in range(190, 610, 42):
-        pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(shaft_x - 20, y, 12, 4)))
-        pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(shaft_x + 226, y, 12, 4)))
-    pygame.draw.rect(screen, warning, apply_rect(pygame.Rect(11368, 535, 78, 6)))
-    pygame.draw.rect(screen, tower_edge, apply_rect(pygame.Rect(11340, 610, 120, 8)))
-
-
-def draw_section8_collapsed_city_details(screen, camera, lift_rect=None, lift_state="idle"):
-    """
-    Section 8 foreground dressing: cracks, railings, sparks, debris, and
-    lift hardware. Visual only.
-    """
-    def apply_rect(rect):
-        if camera is not None:
-            return camera.apply_rect(rect)
-        return rect
-
-    def apply_pos(pos):
-        if camera is not None:
-            return camera.apply_pos(pos)
-        return pos
-
-    metal = (92, 98, 114)
-    metal_dark = (38, 42, 56)
-    cable = (30, 32, 42)
-    hazard = (218, 166, 58)
-    red = (175, 54, 50)
-    spark = (255, 214, 108)
-    glow = (92, 202, 245)
-    soot = (14, 15, 22)
-    dust = (88, 92, 104)
-    glass = (80, 165, 210)
-
-    def draw_edge_barricade(x, edge_y):
-        post_positions = [x, x + 34, x + 78]
-        for post_x in post_positions:
-            pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(post_x, edge_y - 54, 5, 52)))
-            pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(post_x - 2, edge_y - 6, 9, 6)))
-
-        pygame.draw.line(screen, metal_dark, apply_pos((x - 8, edge_y - 48)), apply_pos((x + 92, edge_y - 38)), 4)
-        pygame.draw.line(screen, metal, apply_pos((x - 2, edge_y - 25)), apply_pos((x + 72, edge_y - 31)), 3)
-
-        tape_y = edge_y - 42
-        for stripe_x in range(x + 4, x + 76, 18):
-            pygame.draw.line(screen, hazard, apply_pos((stripe_x, tape_y - 5)), apply_pos((stripe_x + 12, tape_y + 7)), 4)
-            pygame.draw.line(screen, metal_dark, apply_pos((stripe_x + 8, tape_y - 4)), apply_pos((stripe_x + 20, tape_y + 6)), 3)
-
-    def draw_fallen_danger_sign(x, y):
-        sign_points = [
-            (x, y + 7),
-            (x + 44, y),
-            (x + 50, y + 25),
-            (x + 6, y + 31),
-        ]
-        pygame.draw.polygon(screen, hazard, [apply_pos(point) for point in sign_points])
-        pygame.draw.lines(screen, metal_dark, True, [apply_pos(point) for point in sign_points], 3)
-        for stripe_x in [x + 7, x + 21, x + 35]:
-            pygame.draw.line(screen, metal_dark, apply_pos((stripe_x, y + 5)), apply_pos((stripe_x + 11, y + 27)), 4)
-        pygame.draw.rect(screen, red, apply_rect(pygame.Rect(x + 24, y + 9, 5, 13)))
-        pygame.draw.rect(screen, red, apply_rect(pygame.Rect(x + 24, y + 25, 5, 4)))
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(x + 6, y + 32, 48, 4)))
-
-    # Cracked road edge and exposed rebar.
-    for x in range(8540, 10470, 180):
-        pygame.draw.line(screen, metal_dark, apply_pos((x, 648)), apply_pos((x + 52, 620)), 3)
-        pygame.draw.line(screen, metal, apply_pos((x + 14, 646)), apply_pos((x + 58, 632)), 2)
-
-    for x in [8700, 9020, 9360, 10080, 10620, 11040]:
-        pygame.draw.line(screen, soot, apply_pos((x, 642)), apply_pos((x + 42, 650)), 3)
-        pygame.draw.line(screen, soot, apply_pos((x + 20, 646)), apply_pos((x + 10, 660)), 2)
-        pygame.draw.ellipse(screen, soot, apply_rect(pygame.Rect(x + 50, 642, 46, 8)))
-
-    # Clear danger cues around the instant-death void, attached to platform edges.
-    for stripe_x in [9398, 9418, 9444, 9475]:
-        pygame.draw.line(screen, hazard, apply_pos((stripe_x, 642)), apply_pos((stripe_x + 14, 650)), 4)
-    for stripe_x in [11262, 11288, 11324, 11356]:
-        pygame.draw.line(screen, hazard, apply_pos((stripe_x, 642)), apply_pos((stripe_x + 14, 650)), 4)
-
-    draw_edge_barricade(9385, 650)
-    draw_edge_barricade(11278, 650)
-
-    # Uneven glow far below the void, kept sparse so it reads like depth rather than a pattern.
-    for glow_x, glow_w in [(9680, 150), (10380, 210), (11080, 130)]:
-        pygame.draw.ellipse(screen, (72, 18, 26), apply_rect(pygame.Rect(glow_x, 690, glow_w, 11)))
-        pygame.draw.rect(screen, red, apply_rect(pygame.Rect(glow_x + glow_w // 3, 683, glow_w // 3, 3)))
-    draw_fallen_danger_sign(10430, 666)
-
-    # Broken railings along the high route.
-    railing_groups = [
-        (9820, 200, 160),
-        (10160, 300, 400),
-        (10560, 250, 160),
-        (10680, 290, 160),
-        (11000, 200, 160),
-        (11100, 160, 160),
-    ]
-    for x, y, w in railing_groups:
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(x + 6, y - 14, w - 12, 4)))
-        for post_x in range(x + 14, x + w - 10, 44):
-            post_h = 18 if post_x % 3 else 10
-            pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(post_x, y - post_h, 4, post_h)))
-        pygame.draw.line(screen, metal, apply_pos((x + w - 38, y - 12)), apply_pos((x + w + 12, y + 8)), 3)
-        pygame.draw.rect(screen, hazard, apply_rect(pygame.Rect(x + 18, y + 6, min(56, w - 36), 3)))
-
-    # Fallen bridge pieces in the void.
-    debris = [
-        (9665, 470, 44, 12), (9900, 420, 34, 10), (10080, 515, 60, 14),
-        (10340, 448, 38, 12), (10690, 500, 52, 12), (10930, 410, 42, 10),
-        (11160, 455, 36, 12),
-    ]
-    for x, y, w, h in debris:
-        pygame.draw.rect(screen, dust, apply_rect(pygame.Rect(x, y, w, h)))
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(x + 4, y + h - 3, w - 8, 3)))
-        pygame.draw.rect(screen, glass, apply_rect(pygame.Rect(x + 8, y + 3, 12, 3)))
-
-    # Warning beacons and live-wire sparks.
-    for bx, by in [(10730, 230), (11040, 180), (11234, 142)]:
-        pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(bx - 8, by - 8, 16, 8)))
-        pygame.draw.circle(screen, red, apply_pos((bx, by - 10)), 5)
-        pygame.draw.circle(screen, (255, 150, 120), apply_pos((bx, by - 10)), 2)
-
-    for sx, sy in [(10815, 356), (11184, 126), (11318, 310)]:
-        pygame.draw.circle(screen, spark, apply_pos((sx, sy)), 3)
-        pygame.draw.rect(screen, spark, apply_rect(pygame.Rect(sx - 9, sy + 5, 3, 3)))
-        pygame.draw.rect(screen, spark, apply_rect(pygame.Rect(sx + 8, sy - 7, 2, 2)))
-
-    if lift_rect is None:
-        return
-
-    lift_x = lift_rect.x
-    lift_y = lift_rect.y
-    lift_w = lift_rect.width
-    moving = lift_state in ("dropping", "arrived")
-
-    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(lift_x + 8, lift_y - 10, lift_w - 16, 5)))
-    for cx in [lift_x + 28, lift_x + lift_w - 34]:
-        pygame.draw.rect(screen, cable, apply_rect(pygame.Rect(cx, 160, 3, max(0, lift_y - 160))))
-        for ly in range(174, lift_y - 4, 18):
-            pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(cx - 3, ly, 9, 5)))
-        pygame.draw.rect(screen, metal, apply_rect(pygame.Rect(cx - 9, lift_y - 12, 20, 8)))
-
-    pygame.draw.rect(screen, metal_dark, apply_rect(pygame.Rect(lift_x + 24, lift_y + 20, lift_w - 48, 12)))
-    for gear_x in [lift_x + 52, lift_x + lift_w - 58]:
-        pygame.draw.circle(screen, metal, apply_pos((gear_x, lift_y + 29)), 10)
-        pygame.draw.circle(screen, soot, apply_pos((gear_x, lift_y + 29)), 4)
-
-    if moving:
-        for puff_x, puff_y in [(lift_x + 40, lift_y + 44), (lift_x + 114, lift_y + 38), (lift_x + 178, lift_y + 46)]:
-            pygame.draw.ellipse(screen, (90, 94, 108), apply_rect(pygame.Rect(puff_x, puff_y, 28, 12)))
-        pygame.draw.rect(screen, glow, apply_rect(pygame.Rect(lift_x + 88, lift_y + 8, 42, 3)))
-
 
 def draw_section_decorations(screen, camera):
     """
@@ -2247,251 +1081,246 @@ def draw_section_decorations(screen, camera):
     for x in [2700, 3050, 3450, 3780]:
         pygame.draw.ellipse(screen, stain, apply_rect(pygame.Rect(x, 643, 32, 6)))
 
-
-def draw_level1_room_shells(screen, camera, game_map):
+def draw_map1_underground_background(screen, camera, game_map):
     """
-    For each ceiling: draws the dark void above + the wallpaper (stone interior fill)
-    DOWN ONLY as far as the side walls extend. The strip below the wall bottom is left
-    clear so the doorway shows the moon background through it = visually obvious entry.
+    Underground/cavern background for Map 1 (boss arena or checkpoint).
+    Dark stone walls, distant glowing crystals, no moon/sky.
+    """
+    screen_width = screen.get_width()
+    screen_height = screen.get_height()
+
+    # Base dark cavern
+    screen.fill((8, 10, 18))
+
+    # Camera offset for parallax
+    camera_x = 0
+    if camera is not None:
+        if hasattr(camera, "offset"):
+            camera_x = camera.offset.x
+        elif hasattr(camera, "x"):
+            camera_x = camera.x
+        elif hasattr(camera, "camera"):
+            camera_x = camera.camera.x
+
+    # Distant cave walls (parallax layers)
+    far_wall = (18, 22, 38)
+    mid_wall = (28, 32, 48)
+    near_wall = (38, 42, 58)
+
+    # Far layer — distant stalactites
+    for i in range(12):
+        x = (i * 220 - int(camera_x * 0.1)) % (screen_width + 400) - 200
+        y = 20 + (i * 47) % 180
+        h = 60 + (i * 23) % 100
+        pygame.draw.polygon(screen, far_wall, [
+            (x, y), (x + 30, y + h), (x - 30, y + h)
+        ])
+
+    # Mid layer — cave pillars
+    for i in range(8):
+        x = (i * 350 - int(camera_x * 0.25)) % (screen_width + 500) - 250
+        w = 40 + (i * 11) % 50
+        h = 200 + (i * 37) % 150
+        rect = pygame.Rect(x, screen_height - h - 50, w, h)
+        pygame.draw.rect(screen, mid_wall, rect)
+        # Horizontal cracks
+        for cy in range(rect.y + 40, rect.bottom - 40, 50):
+            pygame.draw.rect(screen, (12, 15, 25), (rect.x + 5, cy, rect.width - 10, 3))
+
+    # Near layer — rocky floor edge
+    floor_rect = pygame.Rect(0, screen_height - 80, screen_width, 80)
+    pygame.draw.rect(screen, near_wall, floor_rect)
+    for fx in range(0, screen_width + 100, 40):
+        fx_scroll = (fx - int(camera_x * 0.5)) % (screen_width + 100) - 50
+        pygame.draw.rect(screen, (20, 24, 38), (fx_scroll, screen_height - 85, 20, 10))
+
+    # Glowing crystals in background
+    crystal_glow = (80, 180, 220)
+    crystal_dark = (40, 90, 110)
+    for i in range(15):
+        x = (i * 280 - int(camera_x * 0.15)) % (screen_width + 600) - 300
+        y = screen_height - 120 - (i * 17) % 80
+        pygame.draw.polygon(screen, crystal_dark, [
+            (x, y), (x + 12, y - 28), (x + 24, y)
+        ])
+        pygame.draw.polygon(screen, crystal_glow, [
+            (x + 4, y - 6), (x + 12, y - 24), (x + 20, y - 6)
+        ])
+        # Glow aura
+        glow_surf = pygame.Surface((30, 30), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (80, 180, 220, 40), (15, 15), 15)
+        screen.blit(glow_surf, (x - 3, y - 20))
+
+    # Light fog at bottom
+    fog = pygame.Surface((screen_width, 100), pygame.SRCALPHA)
+    fog.fill((20, 30, 50, 50))
+    screen.blit(fog, (0, screen_height - 100))
+
+def draw_section5_science_buildings(screen, camera):
+    """
+    Section 5 background buildings (x=5100-6400).
+    Tall lab structures behind the platforms so they read as balconies/rooftops.
+    """
+    def apply_rect(rect):
+        if camera is not None:
+            return camera.apply_rect(rect)
+        return rect
+    
+    def apply_pos(pos):
+        if camera is not None:
+            return camera.apply_pos(pos)
+        return pos
+
+    building_main = (34, 42, 62)
+    building_dark = (22, 28, 44)
+    building_light = (52, 62, 82)
+    window_light = (70, 160, 210)
+    window_dark = (15, 25, 45)
+
+    # Building 1 (x~5180-5380)
+    b1_rect = pygame.Rect(5100, 350, 280, 300)
+    pygame.draw.rect(screen, building_main, apply_rect(b1_rect))
+    pygame.draw.rect(screen, building_dark, apply_rect(b1_rect), 3)
+    # Windows
+    for wx in range(b1_rect.x + 30, b1_rect.right - 40, 60):
+        for wy in range(b1_rect.y + 40, b1_rect.bottom - 50, 50):
+            pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx, wy, 35, 30)))
+            pygame.draw.rect(screen, window_light, apply_rect(pygame.Rect(wx + 5, wy + 5, 10, 6)))
+
+    # Building 2 (x~5400-5620) taller
+    b2_rect = pygame.Rect(5380, 250, 240, 400)
+    pygame.draw.rect(screen, building_light, apply_rect(b2_rect))
+    pygame.draw.rect(screen, building_dark, apply_rect(b2_rect), 3)
+    for wx in range(b2_rect.x + 25, b2_rect.right - 35, 55):
+        for wy in range(b2_rect.y + 35, b2_rect.bottom - 60, 60):
+            pygame.draw.rect(screen, window_dark, apply_rect(pygame.Rect(wx, wy, 30, 28)))
+
+    # Building 3 (x~5650-5820)
+    b3_rect = pygame.Rect(5650, 380, 170, 270)
+    pygame.draw.rect(screen, building_main, apply_rect(b3_rect))
+    pygame.draw.rect(screen, building_dark, apply_rect(b3_rect), 2)
+
+    # Building 4 (x~5840-6040) tall
+    b4_rect = pygame.Rect(5840, 300, 200, 350)
+    pygame.draw.rect(screen, building_dark, apply_rect(b4_rect))
+    for wx in range(b4_rect.x + 20, b4_rect.right - 30, 50):
+        pygame.draw.rect(screen, window_light, apply_rect(pygame.Rect(wx, b4_rect.y + 50, 20, 40)))
+
+    # Building 5 (x~6060-6190)
+    b5_rect = pygame.Rect(6060, 420, 130, 230)
+    pygame.draw.rect(screen, building_main, apply_rect(b5_rect))
+
+    # Chimney / antenna on top of building 4
+    pygame.draw.rect(screen, building_light, apply_rect(pygame.Rect(5920, 260, 15, 50)))
+    pygame.draw.circle(screen, window_light, apply_pos((5927, 255)), 5)
+
+def draw_section6_courtyard_buildings(screen, camera):
+    """
+    Section 6 background (x=6400-7600) — combat courtyard.
+    Arena walls and distant stands.
     """
     def apply_rect(rect):
         if camera is not None:
             return camera.apply_rect(rect)
         return rect
 
-    void_color = (14, 17, 26)
-    trim = (72, 82, 112)
-    wallpaper = (26, 30, 46)
-    wallpaper_joint = (16, 19, 30)
+    def apply_pos(pos):
+        if camera is not None:
+            return camera.apply_pos(pos)
+        return pos
 
-    tower_fill = (28, 32, 46)
-    tower_dark = (18, 21, 32)
-    tower_window = (8, 10, 18)
+    arena_wall = (32, 38, 58)
+    arena_wall_light = (52, 60, 80)
+    arena_dark = (18, 22, 38)
 
-    # === First pass: enclosed rooms (ceiling + walls) get void + wallpaper ===
-    handled_rects = set()
-    for plat in game_map.platforms:
-        if plat.y < 320 and plat.height <= 50 and plat.width >= 200:
-            ceiling_bottom = plat.y + plat.height
-            wall_bottom = None
-            for w in game_map.platforms:
-                if (w.height >= 150 and w.width <= 80
-                        and plat.x <= w.x and w.right <= plat.right
-                        and w.y >= ceiling_bottom):
-                    wall_bottom = w.bottom if wall_bottom is None else max(wall_bottom, w.bottom)
-            if wall_bottom is None:
-                continue   # not an enclosed room — handled in second pass
+    # Back wall of courtyard
+    back_wall = pygame.Rect(6400, 400, 1200, 250)
+    pygame.draw.rect(screen, arena_wall, apply_rect(back_wall))
+    pygame.draw.rect(screen, arena_dark, apply_rect(back_wall), 4)
 
-            handled_rects.add(id(plat))
+    # Upper decorative arches
+    for ax in range(6450, 7550, 180):
+        arch_rect = pygame.Rect(ax, 420, 80, 60)
+        pygame.draw.rect(screen, arena_wall_light, apply_rect(arch_rect))
+        pygame.draw.arc(screen, arena_dark, apply_rect(pygame.Rect(ax + 10, 420, 60, 50)), 0, 3.14, 3)
 
-            # Dark void above ceiling
-            void = pygame.Rect(plat.x, plat.y - 400, plat.width, 400 + plat.height)
-            pygame.draw.rect(screen, void_color, apply_rect(void))
-            pygame.draw.rect(screen, trim, apply_rect(pygame.Rect(plat.x, plat.y - 4, plat.width, 4)))
+    # Distant spectator stands (top)
+    stand_base = pygame.Rect(6500, 340, 1000, 80)
+    pygame.draw.rect(screen, arena_wall_light, apply_rect(stand_base))
+    for step in range(4):
+        step_y = 340 + step * 15
+        pygame.draw.rect(screen, arena_dark, apply_rect(pygame.Rect(6500, step_y, 1000, 3)))
 
-            # Wallpaper — stone fill only between ceiling and wall.bottom
-            interior_h = wall_bottom - ceiling_bottom
-            if interior_h > 0:
-                interior = pygame.Rect(plat.x, ceiling_bottom, plat.width, interior_h)
-                pygame.draw.rect(screen, wallpaper, apply_rect(interior))
-                for jy in range(ceiling_bottom + 35, wall_bottom, 50):
-                    pygame.draw.rect(screen, wallpaper_joint, apply_rect(pygame.Rect(plat.x, jy, plat.width, 2)))
+    # Pillars flanking arena
+    for px in [6450, 7550]:
+        pillar = pygame.Rect(px, 420, 40, 230)
+        pygame.draw.rect(screen, arena_wall_light, apply_rect(pillar))
+        pygame.draw.rect(screen, arena_dark, apply_rect(pillar), 2)
+        for py in range(450, 620, 40):
+            pygame.draw.rect(screen, arena_dark, apply_rect(pygame.Rect(px + 5, py, 30, 8)))
 
-    # === Second pass: stacked outdoor slabs (rubble towers) get a tower fill ===
-    # Group platforms by horizontal overlap. If 2+ platforms share x range and are
-    # stacked vertically, draw a stone-tower background spanning their combined extent.
-    candidates = [p for p in game_map.platforms
-                  if p.width >= 100 and p.height <= 50 and p.bottom < 650 and id(p) not in handled_rects]
-    used = set()
-    for p in candidates:
-        if id(p) in used:
-            continue
-        group = [p]
-        for q in candidates:
-            if id(q) in used or q is p:
-                continue
-            # Same x range (within 20px tolerance on each side)
-            if abs(q.x - p.x) <= 20 and abs(q.right - p.right) <= 20:
-                group.append(q)
-        if len(group) < 2:
-            continue
-        for g in group:
-            used.add(id(g))
-        gx = min(g.x for g in group)
-        gright = max(g.right for g in group)
-        gtop = min(g.y for g in group)
-        gbottom = max(g.bottom for g in group)
-        # Extend the fill down to ground level so the tower meets the street
-        tower = pygame.Rect(gx, gtop, gright - gx, 650 - gtop)
-        pygame.draw.rect(screen, tower_fill, apply_rect(tower))
-        pygame.draw.rect(screen, tower_dark, apply_rect(tower), 3)
-        # Window holes — 3 columns, evenly spaced rows down the tower
-        col_count = max(1, (tower.width - 40) // 80)
-        col_step = (tower.width - 40) // max(1, col_count)
-        for row_y in range(gtop + 30, 650 - 40, 70):
-            for c in range(col_count):
-                wx = gx + 20 + c * col_step
-                pygame.draw.rect(screen, tower_window, apply_rect(pygame.Rect(wx, row_y, 30, 26)))
-
-
-def draw_map1_underground_background(screen, camera, game_map):
-    """Dark underground checkpoint backdrop for the Tiled MAP 1 room."""
+def draw_section8_collapsed_city_background(screen, camera):
+    """
+    Section 8 background (x=8400-9500) — collapsed city / bridge area.
+    Distant ruined skyscrapers and bridge supports.
+    """
     def apply_rect(rect):
-        return camera.apply_rect(rect) if camera is not None else rect
+        if camera is not None:
+            return camera.apply_rect(rect)
+        return rect
 
     def apply_pos(pos):
-        return camera.apply_pos(pos) if camera is not None else pos
+        if camera is not None:
+            return camera.apply_pos(pos)
+        return pos
 
-    def rect(x, y, w, h, color):
-        pygame.draw.rect(screen, color, apply_rect(pygame.Rect(x, y, w, h)))
+    skyline_far = (22, 28, 48)
+    skyline_mid = (32, 38, 58)
+    skyline_near = (42, 48, 68)
 
-    def line(start, end, color, width=1):
-        pygame.draw.line(screen, color, apply_pos(start), apply_pos(end), width)
+    # Far distant skyscrapers
+    for i, x in enumerate(range(8500, 9600, 180)):
+        h = 180 + (i * 37) % 150
+        w = 50 + (i * 13) % 40
+        rect = pygame.Rect(x, 650 - h, w, h)
+        pygame.draw.rect(screen, skyline_far, apply_rect(rect))
+        # Windows
+        for wy in range(rect.y + 20, rect.bottom - 20, 35):
+            pygame.draw.rect(screen, (50, 70, 100), apply_rect(pygame.Rect(rect.x + 10, wy, 12, 20)))
 
-    bg = (5, 6, 10)
-    wall = (10, 12, 18)
-    wall_mid = (16, 18, 26)
-    wall_light = (24, 27, 38)
-    crack = (3, 4, 8)
-    metal = (42, 48, 61)
-    metal_dark = (24, 28, 37)
-    blue = (65, 190, 226)
-    moon = (190, 205, 226)
-    moon_glow = (40, 55, 78)
-    amber = (155, 105, 42)
+    # Mid-distance ruined towers
+    for i, x in enumerate(range(8700, 9400, 220)):
+        h = 250 + (i * 43) % 180
+        w = 70 + (i * 17) % 50
+        rect = pygame.Rect(x, 650 - h, w, h)
+        pygame.draw.rect(screen, skyline_mid, apply_rect(rect))
+        pygame.draw.rect(screen, (15, 20, 35), apply_rect(rect), 2)
+        # Broken top
+        pygame.draw.polygon(screen, skyline_mid, [
+            apply_pos((rect.x, rect.y)),
+            apply_pos((rect.x + rect.width // 2, rect.y - 20)),
+            apply_pos((rect.right, rect.y)),
+        ])
 
-    # Solid underground darkness. This fully hides the outside skyline.
-    rect(0, 0, game_map.width, game_map.height, bg)
-    rect(0, 110, game_map.width, 520, wall)
+    # Bridge support columns (massive)
+    for bx in [8800, 9200]:
+        column = pygame.Rect(bx, 480, 40, 170)
+        pygame.draw.rect(screen, skyline_near, apply_rect(column))
+        pygame.draw.rect(screen, (25, 30, 45), apply_rect(column), 3)
+        # Cross beams
+        pygame.draw.rect(screen, (50, 60, 80), apply_rect(pygame.Rect(bx - 10, 540, 60, 8)))
+        pygame.draw.rect(screen, (50, 60, 80), apply_rect(pygame.Rect(bx - 10, 580, 60, 8)))
 
-    # Heavy stone ceiling and lower foundation.
-    rect(0, 0, game_map.width, 118, (12, 13, 18))
-    rect(0, 118, game_map.width, 10, metal_dark)
-    rect(0, 626, game_map.width, 94, (12, 13, 18))
-    rect(0, 626, game_map.width, 5, metal)
+    # Hanging cables from bridge (broken)
+    cable = (25, 30, 40)
+    pygame.draw.line(screen, cable, apply_pos((8840, 480)), apply_pos((9000, 520)), 3)
+    pygame.draw.line(screen, cable, apply_pos((9000, 520)), apply_pos((9160, 480)), 3)
+    pygame.draw.line(screen, cable, apply_pos((9240, 480)), apply_pos((9400, 510)), 3)
 
-    # Large carved stone wall panels, not buildings.
-    panel_w = 210
-    for i, x in enumerate(range(45, game_map.width, panel_w)):
-        panel_h = 390 if i % 2 == 0 else 330
-        y = 178 if i % 3 != 0 else 220
-        rect(x, y, panel_w - 42, panel_h, wall_mid)
-        rect(x + 8, y + 8, panel_w - 58, panel_h - 16, wall)
-        rect(x, y, panel_w - 42, 5, wall_light)
-        rect(x, y + panel_h - 5, panel_w - 42, 5, crack)
-
-        # Chipped stone marks and horizontal seams.
-        for sy in range(y + 54, y + panel_h - 30, 68):
-            rect(x + 22, sy, 36, 4, crack)
-            rect(x + 88, sy + 18, 52, 4, (22, 25, 35))
-        for cx, cy in [(x + 34, y + 28), (x + 120, y + 78), (x + 70, y + panel_h - 54)]:
-            line((cx, cy), (cx + 14, cy + 11), crack, 3)
-            line((cx + 14, cy + 11), (cx + 10, cy + 23), crack, 2)
-
-    # Support columns and braces built into the underground wall.
-    for x in (145, 420, 720, 1010, 1325):
-        rect(x, 128, 18, 498, metal_dark)
-        rect(x + 4, 128, 6, 498, metal)
-        for y in range(155, 602, 56):
-            rect(x - 8, y, 34, 5, metal)
-    for x1, x2, y in [(170, 310, 205), (460, 620, 255), (770, 930, 205), (1060, 1230, 250)]:
-        line((x1, y), (x2, y + 42), metal_dark, 3)
-        line((x2, y + 42), (x2 + 80, y + 18), metal_dark, 3)
-
-    # Pipes and old sanctuary utilities.
-    for y, color in [(156, metal_dark), (172, metal), (198, metal_dark)]:
-        rect(0, y, game_map.width, 5, color)
-    for x in range(80, game_map.width, 260):
-        rect(x, 146, 34, 18, metal_dark)
-        rect(x + 8, 150, 18, 4, blue)
-    for x in (585, 1165):
-        rect(x, 198, 10, 148, metal_dark)
-        rect(x - 6, 334, 22, 8, metal)
-        rect(x - 4, 344, 18, 42, metal_dark)
-
-    # Small barred moonlight grate. A little outside light, not an open city view.
-    grate = pygame.Rect(1008, 72, 112, 48)
-    rect(grate.x - 10, grate.y - 8, grate.width + 20, grate.height + 16, (20, 24, 34))
-    rect(grate.x, grate.y, grate.width, grate.height, (7, 9, 15))
-    pygame.draw.circle(screen, moon, apply_pos((grate.centerx + 18, grate.centery)), 18)
-    for bx in range(grate.x + 14, grate.right, 18):
-        rect(bx, grate.y, 5, grate.height, metal_dark)
-    rect(grate.x, grate.y, grate.width, 5, metal)
-    rect(grate.x, grate.bottom - 5, grate.width, 5, metal)
-    rect(grate.centerx - 52, grate.bottom + 12, 150, 18, moon_glow)
-    rect(grate.centerx - 32, grate.bottom + 44, 105, 14, moon_glow)
-    rect(grate.centerx - 10, grate.bottom + 72, 62, 10, moon_glow)
-
-    # Rubble, drains, and floor-level details.
-    for x in range(30, game_map.width, 170):
-        rect(x, 604, 18, 4, blue)
-        rect(x + 42, 610, 28, 5, crack)
-    for x, y, w in [(210, 590, 46), (486, 612, 65), (820, 596, 38), (1210, 612, 74), (1410, 590, 42)]:
-        rect(x, y, w, 8, wall_light)
-        rect(x + 8, y - 8, max(12, w - 20), 8, wall_mid)
-    for x, y in [(330, 300), (690, 410), (945, 260), (1185, 372), (1390, 285)]:
-        rect(x, y, 3, 3, (55, 65, 86))
-    for x in (66, 930, 1450):
-        rect(x, 528, 28, 54, metal_dark)
-        rect(x + 5, 538, 18, 4, amber)
-        rect(x + 6, 554, 16, 4, amber)
-
-def draw_map1_moon_altar(screen, camera, altar_rect, used):
-    """Small one-use healing altar for the checkpoint map."""
-    if altar_rect is None:
-        return
-
-    def apply_rect(rect):
-        return camera.apply_rect(rect) if camera is not None else rect
-
-    def apply_pos(pos):
-        return camera.apply_pos(pos) if camera is not None else pos
-
-    x = altar_rect.x
-    y = altar_rect.y
-    w = altar_rect.width
-    h = altar_rect.height
-
-    stone_dark = (29, 32, 44)
-    stone = (58, 63, 82)
-    stone_light = (122, 132, 154)
-    gold = (208, 170, 78)
-    gold_dark = (104, 77, 38)
-    glow = (90, 204, 238) if not used else (70, 78, 92)
-    glow_soft = (35, 82, 116) if not used else (28, 32, 42)
-    core = (225, 246, 255) if not used else (118, 126, 140)
-    dim = (16, 18, 26)
-
-    # Base steps.
-    pygame.draw.rect(screen, stone_dark, apply_rect(pygame.Rect(x + 6, y + h - 16, w - 12, 16)))
-    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + 14, y + h - 28, w - 28, 14)))
-    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + 14, y + h - 28, w - 28, 3)))
-    pygame.draw.rect(screen, gold_dark, apply_rect(pygame.Rect(x + 22, y + h - 34, w - 44, 8)))
-    pygame.draw.rect(screen, gold, apply_rect(pygame.Rect(x + 27, y + h - 36, w - 54, 3)))
-
-    # Twin pillars.
-    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + 12, y + 26, 8, 34)))
-    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + w - 20, y + 26, 8, 34)))
-    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + 10, y + 24, 12, 5)))
-    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + w - 22, y + 24, 12, 5)))
-
-    # Moon core and glow.
-    center = (x + w // 2, y + 24)
-    if not used:
-        pygame.draw.circle(screen, glow_soft, apply_pos(center), 31)
-        pygame.draw.circle(screen, glow, apply_pos(center), 20)
-    else:
-        pygame.draw.circle(screen, dim, apply_pos(center), 22)
-        pygame.draw.circle(screen, stone, apply_pos(center), 16)
-
-    pygame.draw.circle(screen, core, apply_pos(center), 10)
-    pygame.draw.circle(screen, glow, apply_pos((center[0] + 5, center[1] - 1)), 8)
-    pygame.draw.circle(screen, dim, apply_pos((center[0] + 9, center[1] - 2)), 8)
-
-    # Small rune lights.
-    rune_color = glow if not used else stone
-    for rx, ry in [(x + 25, y + h - 20), (x + w // 2 - 3, y + h - 22), (x + w - 31, y + h - 20)]:
-        pygame.draw.rect(screen, rune_color, apply_rect(pygame.Rect(rx, ry, 6, 3)))
+    # Glowing emergency lights on bridge
+    for lx in [8900, 9100, 9300]:
+        pygame.draw.circle(screen, (200, 80, 40), apply_pos((lx, 475)), 4)
+        pygame.draw.circle(screen, (255, 150, 80), apply_pos((lx, 475)), 2)
 
 
 def draw_map3_train_station_background(screen, camera, game_map):
@@ -3835,6 +2664,56 @@ def draw_map8_architecture_final_background(screen, camera, game_map):
 
 
 
+def draw_map1_moon_altar(screen, camera, altar_rect, used):
+    """Small one-use healing altar for the checkpoint map."""
+    if altar_rect is None:
+        return
+
+    def apply_rect(rect):
+        return camera.apply_rect(rect) if camera is not None else rect
+
+    def apply_pos(pos):
+        return camera.apply_pos(pos) if camera is not None else pos
+
+    x = altar_rect.x
+    y = altar_rect.y
+    w = altar_rect.width
+    h = altar_rect.height
+
+    stone_dark = (29, 32, 44)
+    stone = (58, 63, 82)
+    stone_light = (122, 132, 154)
+    gold = (208, 170, 78)
+    gold_dark = (104, 77, 38)
+    glow = (90, 204, 238) if not used else (70, 78, 92)
+    glow_soft = (35, 82, 116) if not used else (28, 32, 42)
+    core = (225, 246, 255) if not used else (118, 126, 140)
+    dim = (16, 18, 26)
+
+    pygame.draw.rect(screen, stone_dark, apply_rect(pygame.Rect(x + 6, y + h - 16, w - 12, 16)))
+    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + 14, y + h - 28, w - 28, 14)))
+    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + 14, y + h - 28, w - 28, 3)))
+    pygame.draw.rect(screen, gold_dark, apply_rect(pygame.Rect(x + 22, y + h - 34, w - 44, 8)))
+    pygame.draw.rect(screen, gold, apply_rect(pygame.Rect(x + 27, y + h - 36, w - 54, 3)))
+
+    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + 12, y + 26, 8, 34)))
+    pygame.draw.rect(screen, stone, apply_rect(pygame.Rect(x + w - 20, y + 26, 8, 34)))
+    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + 10, y + 24, 12, 5)))
+    pygame.draw.rect(screen, stone_light, apply_rect(pygame.Rect(x + w - 22, y + 24, 12, 5)))
+
+    center = (x + w // 2, y + 24)
+    if not used:
+        pygame.draw.circle(screen, glow_soft, apply_pos(center), 31)
+        pygame.draw.circle(screen, glow, apply_pos(center), 20)
+    else:
+        pygame.draw.circle(screen, dim, apply_pos(center), 22)
+        pygame.draw.circle(screen, stone, apply_pos(center), 16)
+
+    pygame.draw.circle(screen, core, apply_pos(center), 10)
+    pygame.draw.circle(screen, glow, apply_pos((center[0] + 5, center[1] - 1)), 8)
+    pygame.draw.circle(screen, dim, apply_pos((center[0] + 9, center[1] - 2)), 8)
+
+
 class LevelManager:
     def __init__(self):
         self.maps = self.build_maps()
@@ -3864,79 +2743,105 @@ class LevelManager:
         self.map7_moon_altar_rect = pygame.Rect(1245, 536, 82, 68)
         self.map7_moon_altar_used = False
 
+        # CSV/PNG Tiled map loading for Map 0 (your part)
+        self.csv_tile_surfaces = []
+        self.csv_map = []
+        self.tiled_layers = []  # List of (surface, x, y) for each layer
+        self.last_vel_x = 0  # Track last horizontal velocity to detect direction change
+        self.jump_state = "rising"  # rising, falling, landing
+        self.dash_distance = 0  # Track dash distance
+        self.dash_start_x = 0  # Dash start position
+        self.tiled_image = None
 
-    def build_default_map1(self):
-        return GameMap(
-            1,
-            "The Warden - Boss Arena",
-            MAP_1_WIDTH,
-            MAP_1_HEIGHT,
-            [
-                pygame.Rect(0, 650, MAP_1_WIDTH, 70),
-                pygame.Rect(0, 200, MAP_1_WIDTH, 40),
-                pygame.Rect(0, 240, 30, 410),
-                pygame.Rect(MAP_1_WIDTH - 30, 240, 30, 410),
-                pygame.Rect(150, 540, 200, 110),
-                pygame.Rect(MAP_1_WIDTH - 350, 540, 200, 110),
-                pygame.Rect(0, SCREEN_HEIGHT - 20, MAP_1_WIDTH, 20),
-            ],
-            (100, 650),
-            [
-                {
-                    "rect": pygame.Rect(MAP_1_WIDTH - 120, 550, DOOR_WIDTH, DOOR_HEIGHT),
-                    "target_map": 2,
-                    "label": "Resting Area",
-                }
-            ],
-            boss_spawn=(MAP_1_WIDTH // 2, 590),
-            map_type="boss_stage",
-        )
+        try:
+            self.tiled_image = pygame.image.load(PROJECT_ROOT / "assets" / "Map0.png").convert_alpha()
+            # tileset_image = pygame.image.load("assets/Map0.png").convert_alpha()
 
-    def build_tiled_map1(self):
-        map_path = Path(__file__).resolve().parents[2] / "assets" / "maps" / "map1.json"
-        tiled = load_tiled_map(map_path)
+            # self.csv_tile_surfaces = self._slice_tileset(self.tiled_image, 32, 32)
+            # print(f"Tileset loaded: {len(self.csv_tile_surfaces)} tiles")
+            print("Map0.png loaded successfully")
 
-        if tiled is None or not tiled["platforms"]:
-            return self.build_default_map1()
+            # Load all layer CSVs and render them
+            # layer_files = [
+            #     ("maps/Map0_Tile Layer 1 Floor.csv", "Floor"),      # layer 0 (bottom)
+            #     ("maps/Map0_Tile Layer 2 Wall.csv", "Wall"),       # layer 1
+            #     ("maps/Map0_Tile Layer 3 Platform (Rect).csv", "Platform"),  # layer 2
+            #     ("maps/Map0_Tile Layer 4 Object.csv", "Object"),     # layer 3 (top)
+            # ]
 
-        player_spawn = tiled["player_spawn"]
-        if player_spawn is None and tiled["moving_platforms"]:
-            first_lift = tiled["moving_platforms"][0].rect
-            player_spawn = (first_lift.centerx, first_lift.top)
-        if player_spawn is None:
-            player_spawn = (100, 650)
+        except Exception as e:
+            print(f"Failed to load Tiled map: {e}")
 
-        doors = tiled["doors"] or [
-            {
-                "rect": pygame.Rect(MAP_1_WIDTH - 70, 120, 70, 180),
-                "target_map": 2,
-                "label": "Level 2",
-                "visible": False,
-                "auto": True,
-            }
-        ]
+    # def _slice_tileset(self, image, tile_w, tile_h):
+    #     surfaces = []
+    #     for y in range(0, image.get_height(), tile_h):
+    #         for x in range(0, image.get_width(), tile_w):
+    #             surfaces.append(image.subsurface((x, y, tile_w, tile_h)))
+    #     return surfaces
 
-        # Default MAP 1 shop position. If you add an Interactables/merchant object
-        # in Tiled later, that Tiled rectangle will override this fallback.
-        map1_shop_rect = tiled["shop_rect"] or pygame.Rect(520, 506, 150, 90)
+    # def _load_csv_raw(self, filepath):
+    #     map_data = []
+    #     with open(filepath, 'r') as f:
+    #         for line in f:
+    #             line = line.strip()
+    #             if not line:
+    #                 continue
+    #             cells = line.split(',')
+    #             int_row = []
+    #             for cell in cells:
+    #                 val = cell.strip()
+    #                 if val == '' or val == '-1':
+    #                     int_row.append(-1)
+    #                 else:
+    #                     try:
+    #                         int_row.append(int(val))
+    #                     except ValueError:
+    #                         int_row.append(-1)
+    #             if int_row:
+    #                 map_data.append(int_row)
+    #     print(f"Loaded {len(map_data)} rows, {len(map_data[0]) if map_data else 0} columns")
+    #     return map_data
 
-        return GameMap(
-            1,
-            "Checkpoint - Lower Sanctuary",
-            tiled["width"] or MAP_1_WIDTH,
-            tiled["height"] or MAP_1_HEIGHT,
-            tiled["platforms"],
-            player_spawn,
-            doors,
-            enemy_spawns=tiled["enemy_spawns"],
-            boss_spawn=tiled["boss_spawn"],
-            shop_rect=map1_shop_rect,
-            moving_platforms=tiled["moving_platforms"],
-            checkpoints=tiled["checkpoints"],
-            interactables=tiled["interactables"],
-            hazards=tiled["hazards"],
-            map_type="checkpoint_stage",
-        )
+    # def _render_layer(self, layer_data, tile_w, tile_h, layer_name="unknown"):
+    #     """Render a single CSV layer to a pygame Surface"""
+    #     if not layer_data or not layer_data[0]:
+    #         return None
+
+    #     rows = len(layer_data)
+    #     cols = len(layer_data[0])
+
+    #     # Calculate surface size
+    #     width = cols * tile_w
+    #     height = rows * tile_h
+
+    #     # Create transparent surface for this layer
+    #     surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        
+    #     tiles_drawn = 0
+    #     # Draw each tile
+    #     for row in range(rows):
+    #         for col in range(cols):
+    #             tile_id = layer_data[row][col]
+    #             if tile_id >= 0:
+    #                 x = col * tile_w
+    #                 y = row * tile_h
+    #                 pygame.draw.rect(surface, (255, 0, 0), (x, y, tile_w, tile_h))
+    #                 # surface.blit(self.csv_tile_surfaces[tile_id], (x, y))
+    #                 tiles_drawn += 1
+        
+    #     print(f"Layer: {layer_name}, tiles drawn: {tiles_drawn} / {rows*cols}")
+    #     return surface
+
+    def find_platform_rect(self, map_id, x, y, width, height):
+        """Find a platform in the given map by its rect position/size."""
+        game_map = self.maps.get(map_id)
+        if game_map is None:
+            return None
+        target = pygame.Rect(x, y, width, height)
+        for plat in game_map.platforms:
+            if plat == target:
+                return plat
+        return None
 
     def build_default_map2(self):
         return GameMap(
@@ -4503,12 +3408,10 @@ class LevelManager:
                 # shop_rect=pygame.Rect(8830, 530, 130, 90),
                 map_type="science_city_stage",
             ),
-
             # =========================================================================
-            # MAP 1: Checkpoint / Tiled map
+            # MAP 1: LEVEL 1 BOSS — The Warden Arena
             # =========================================================================
             1: self.build_tiled_map1(),
-
             # =========================================================================
             # MAP 2: LEVEL 2 - Pale Crown Underfacility / Tiled map
             # =========================================================================
@@ -4537,6 +3440,71 @@ class LevelManager:
             8: self.build_tiled_map8(),
         }
 
+    def build_default_map1(self):
+        return GameMap(
+            1,
+            "The Warden - Boss Arena",
+            MAP_1_WIDTH,
+            MAP_1_HEIGHT,
+            [
+                pygame.Rect(0, 650, MAP_1_WIDTH, 70),
+                pygame.Rect(0, 200, MAP_1_WIDTH, 40),
+                pygame.Rect(0, 240, 30, 410),
+                pygame.Rect(MAP_1_WIDTH - 30, 240, 30, 410),
+                pygame.Rect(150, 540, 200, 110),
+                pygame.Rect(MAP_1_WIDTH - 350, 540, 200, 110),
+                pygame.Rect(0, SCREEN_HEIGHT - 20, MAP_1_WIDTH, 20),
+            ],
+            (100, 650),
+            [
+                {
+                    "rect": pygame.Rect(MAP_1_WIDTH - 120, 550, DOOR_WIDTH, DOOR_HEIGHT),
+                    "target_map": 2,
+                    "label": "Resting Area",
+                }
+            ],
+            boss_spawn=(MAP_1_WIDTH // 2, 590),
+            map_type="boss_stage",
+        )
+
+    def build_tiled_map1(self):
+        map_path = Path(__file__).resolve().parents[2] / "assets" / "maps" / "map1.json"
+        tiled = load_tiled_map(map_path)
+        if tiled is None or not tiled["platforms"]:
+            return self.build_default_map1()
+        player_spawn = tiled["player_spawn"]
+        if player_spawn is None and tiled["moving_platforms"]:
+            first_lift = tiled["moving_platforms"][0].rect
+            player_spawn = (first_lift.centerx, first_lift.top)
+        if player_spawn is None:
+            player_spawn = (100, 650)
+        doors = tiled["doors"] or [
+            {
+                "rect": pygame.Rect(MAP_1_WIDTH - 70, 120, 70, 180),
+                "target_map": 2,
+                "label": "Level 2",
+                "visible": False,
+                "auto": True,
+            }
+        ]
+        map1_shop_rect = tiled["shop_rect"] or pygame.Rect(520, 506, 150, 90)
+        return GameMap(
+            1,
+            "Checkpoint - Lower Sanctuary",
+            tiled["width"] or MAP_1_WIDTH,
+            tiled["height"] or MAP_1_HEIGHT,
+            tiled["platforms"],
+            player_spawn,
+            doors,
+            enemy_spawns=tiled["enemy_spawns"],
+            boss_spawn=tiled["boss_spawn"],
+            shop_rect=map1_shop_rect,
+            moving_platforms=tiled["moving_platforms"],
+            checkpoints=tiled["checkpoints"],
+            interactables=tiled["interactables"],
+            hazards=tiled["hazards"],
+            map_type="checkpoint_stage",
+        )
 
     def reset_one_use_items(self):
         self.map1_moon_altar_used = False
@@ -4585,6 +3553,7 @@ class LevelManager:
         return player.rect.colliderect(interaction_rect)
 
     def use_moon_altar(self, player):
+        """Use the moon altar (heal and restore mana)."""
         if not self.can_use_moon_altar(player):
             return False
 
@@ -4597,11 +3566,43 @@ class LevelManager:
         player.invincible_timer = 0
         self._set_current_moon_altar_used()
         return True
+    
+    def draw_tiled_map(self, screen, camera):
+        """Draw all Tiled CSV layers (multi-layer support)"""
+        if not self.tiled_layers:
+            return
 
+        # Get camera offset
+        camera_x = 0
+        camera_y = 0
+        if camera is not None:
+            if hasattr(camera, "offset"):
+                camera_x = camera.offset.x
+                camera_y = camera.offset.y
+            print(f"DEBUG: Camera offset: ({camera_x}, {camera_y})")
+
+        # Draw each layer (they are already in correct order from loading)
+        for layer_surface, layer_name in self.tiled_layers:
+            if layer_surface:
+                print(f"DEBUG: Layer: {layer_name}, size={layer_surface.get_size()}")
+                screen.blit(layer_surface, (0, 0))
+                # print(f"Blitting {layer_name} at -{camera_x}, -{camera_y}")
+                # screen.blit(layer_surface, (-camera_x, -camera_y))
+
+    def draw_tiled_image(self, screen, camera):
+        if self.tiled_image is None:
+            return
+
+        if camera is None:
+            screen.blit(self.tiled_image, (0, 0))
+            return
+
+        camera_x = camera.offset.x if hasattr(camera, "offset") else getattr(camera, "x", 0)
+        camera_y = camera.offset.y if hasattr(camera, "offset") else getattr(camera, "y", 0)
+        screen.blit(self.tiled_image, (-camera_x, -camera_y))
 
     def get_current_map(self):
         return self.current_map
-
 
     def reset_current_moving_platforms(self):
         for moving_platform in self.current_map.moving_platforms:
@@ -4808,6 +3809,25 @@ class LevelManager:
     def get_doors(self):
         return self.current_map.doors
 
+    def check_deadly_void(self, player_rect):
+        """Check if player falls into a deadly void (instant respawn)."""
+        voids = self.deadly_voids.get(self.current_map_id, [])
+        for void_rect in voids:
+            if player_rect.colliderect(void_rect):
+                return True
+        return False
+
+    def check_moon_altar(self, player_rect):
+        """Check if player touches the moon altar in map 1."""
+        if self.current_map_id != 1:
+            return False
+        if self.map1_moon_altar_used:
+            return False
+        if player_rect.colliderect(self.map1_moon_altar_rect):
+            self.map1_moon_altar_used = True
+            return True
+        return False
+
     def draw_current_map(self, screen, camera):
         font = pygame.font.Font(None, 28)
 
@@ -4833,22 +3853,21 @@ class LevelManager:
             draw_moon_background(screen, camera, self.current_map)
 
             # 2. Enclosed-room shells: dark void above ceilings + stone interior fill.
-            #    Auto-detects ceiling rects in any map's platform list.
             draw_level1_room_shells(screen, camera, self.current_map)
 
             # 3. Street embankment behind ground islands.
-            #    Auto-detects ground rects (y=650, h=70) in any map's platform list.
             draw_level1_wall_masses(screen, camera, self.current_map)
 
             # 3b. Section 5 + Section 6 background buildings - drawn BEHIND platforms
-            #     so the platforms read as balconies / rooftops on the buildings.
             if self.current_map.map_id == 0:
                 draw_section5_science_buildings(screen, camera)
                 draw_section6_courtyard_buildings(screen, camera)
                 draw_section8_collapsed_city_background(screen, camera)
 
-        # 4. Foreground platforms (ground, ledges, rubble, pillars, ceilings).
-        #    draw_moon_platform picks the right visual based on rect shape.
+        # 4. Draw Tiled CSV/PNG map (YOUR TILED MAP - placed behind platforms)
+        self.draw_tiled_map(screen, camera)
+
+        # 5. Foreground platforms (ground, ledges, rubble, pillars, ceilings)
         for platform in self.current_map.platforms:
             # Skip the safety floor at very bottom — it's invisible by design.
             if platform.y >= self.current_map.height - 30 and platform.height <= 30:
@@ -4864,6 +3883,7 @@ class LevelManager:
                 draw_map6_tiled_platform(screen, draw_rect)
             else:
                 draw_moon_platform(screen, draw_rect)
+                pass
 
         for collapsing_platform in getattr(self.current_map, "collapsing_platforms", []):
             draw_collapsing_platform(screen, camera, collapsing_platform)
@@ -4879,22 +3899,10 @@ class LevelManager:
         # 5. Decorative props (no collision) — bones, blood, broken cars, signs, furniture.
         if self.current_map.map_id == 0:
             draw_section_decorations(screen, camera)
-            # Section 4 detailed tram-wreck visuals (overlay on top of the platform stones)
             draw_section4_tram_wreck(screen, camera)
-            # Section 7 lab-entrance overlay — windows, chains, pipes, lamps, signs
-            draw_section7_lab_entrance_details(screen, camera)
-            draw_section8_collapsed_city_details(
-                screen,
-                camera,
-                self.collapsing_lift_rect,
-                self.collapsing_lift_state,
-            )
             draw_body_pile(screen, camera, 135, 650)
 
-        # 6. UI / Interactive Elements Layer
-        if self.current_map.map_id == 0:
-            return
-
+        # 7. UI / Interactive Elements Layer
         for door in self.current_map.doors:
             if door.get("visible", True) is False:
                 continue
@@ -4920,10 +3928,18 @@ class LevelManager:
             text = font.render(door["label"], True, (20, 40, 20))
             screen.blit(text, text.get_rect(center=draw_rect.center))
 
-    def check_doors(self, player):
-        if self.current_map_id == 0:
-            return None
+        # 8. Draw collapsing lift if active
+        if self.current_map_id == 0 and self.collapsing_lift_rect:
+            draw_rect = self.collapsing_lift_rect
+            if camera is not None:
+                draw_rect = camera.apply_rect(draw_rect)
+            draw_moon_platform(screen, draw_rect)
 
+        # 9. Draw the Tiled art over MAP 0's procedural base.
+        if self.current_map_id == 0:
+            self.draw_tiled_image(screen, camera)
+
+    def check_doors(self, player):
         for door in self.current_map.doors:
             if door.get("auto", False) or door.get("visible", True) is False:
                 continue
@@ -4943,6 +3959,11 @@ class LevelManager:
 
         return None
 
+    def update(self, dt, player):
+        """Update any level-specific animations (collapsing lift, etc.)."""
+        self.update_moving_platforms(dt, player)
+        self.update_collapsing_lift(dt, player)
+
     # Backward-friendly names for older code and beginner readability.
     def get_current_room(self):
         return self.get_current_map()
@@ -4958,3 +3979,18 @@ class LevelManager:
 
     def get_current_fulcrums(self):
         return self.get_fulcrums()
+
+    def reset_one_use_items(self):
+        """Reset any one-time items (like fulcrums, altars, etc.) when restarting game."""
+        for game_map in self.maps.values():
+            for fulcrum in game_map.fulcrums:
+                fulcrum["used"] = False
+
+        self.map1_moon_altar_used = False
+        self.map3_moon_altar_used = False
+        self.map5_moon_altar_used = False
+        self.map7_moon_altar_used = False
+
+        self.reset_collapsing_lift()
+        self.reset_current_moving_platforms()
+        self.reset_current_collapsing_platforms()

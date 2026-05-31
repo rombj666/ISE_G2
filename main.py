@@ -64,6 +64,7 @@ def main():
 
     level_manager = LevelManager()
     player = Player(100, 500)
+    player.load_all_animations() 
     enemy = Enemy(0, 0)
     moon_shard = MoonShard()
     current_map = level_manager.get_current_map()
@@ -568,6 +569,11 @@ def handle_player_attack(player, enemy):
 
     if weapon["weapon_type"] == "projectile":
         return
+    
+    print(f"Attack hitbox: {attack_hitbox}")
+    print(f"Enemy rect: {enemy.rect}")
+    print(f"Collision: {attack_hitbox.colliderect(enemy.rect)}")
+    print(f"player.attack_has_hit: {player.attack_has_hit}")
 
     attack_hitbox = player.get_attack_hitbox()
 

@@ -2,7 +2,6 @@ import math
 
 import pygame
 
-
 class MoonShard:
     """
     A glowing crystalline moon shard that floats beside the player at all times.
