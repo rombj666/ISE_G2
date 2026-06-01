@@ -857,14 +857,14 @@ class Player:
         move_amount = int(round(self.vel_x))
         self.rect.x += move_amount
 
-        # for platform in platforms:
-        #     if self.rect.colliderect(platform):
-        #         if move_amount > 0:
-        #             self.rect.right = platform.left
-        #             self.vel_x = 0
-        #         elif move_amount < 0:
-        #             self.rect.left = platform.right
-        #             self.vel_x = 0
+        for platform in platforms:
+            if self.rect.colliderect(platform):
+                if move_amount > 0:
+                    self.rect.right = platform.left
+                    self.vel_x = 0
+                elif move_amount < 0:
+                    self.rect.left = platform.right
+                    self.vel_x = 0
 
     def move_y(self, platforms):
         self.rect.y += self.vel_y
