@@ -3,7 +3,6 @@ import math
 import pygame
 
 from settings import SCREEN_HEIGHT, SCREEN_WIDTH, TITLE
-from src.entities.player import Player
 
 
 class MainMenu:
@@ -13,7 +12,7 @@ class MainMenu:
         self.time = 0.0
         self.orb_x = SCREEN_WIDTH * 0.38
         self.orb_y = SCREEN_HEIGHT * 0.38
-        self.menu_player = Player(0, 0)
+        self.menu_facing = 1
         self.start_rect = pygame.Rect(96, 292, 280, 58)
         self.quit_rect = pygame.Rect(96, 370, 280, 58)
 
@@ -103,9 +102,57 @@ class MainMenu:
         character_rect = pygame.Rect(0, 0, 72, 96)
         character_rect.midbottom = (910, SCREEN_HEIGHT - 80 + int(breathe))
 
-        self.menu_player.facing = -1 if self.orb_x < character_rect.centerx else 1
-        self.menu_player.draw_kael_template(screen, character_rect, (180, 220, 255))
+        self.menu_facing = -1 if self.orb_x < character_rect.centerx else 1
+        self._draw_kael_preview(screen, character_rect)
         self._draw_eye_glow(screen, character_rect)
+
+    def _draw_kael_preview(self, screen, rect):
+        x = rect.x
+        y = rect.y
+        scale_x = rect.width / 48
+        scale_y = rect.height / 64
+
+        def scaled_rect(px, py, pw, ph):
+            return pygame.Rect(
+                x + int(px * scale_x),
+                y + int(py * scale_y),
+                max(1, int(pw * scale_x)),
+                max(1, int(ph * scale_y)),
+            )
+
+        armor_dark = (30, 34, 48)
+        armor_mid = (58, 64, 86)
+        armor_light = (105, 116, 145)
+        moon_core = (150, 220, 255)
+        moon_glow = (90, 170, 230)
+        shadow = (12, 14, 22)
+
+        pygame.draw.rect(screen, moon_glow, scaled_rect(17, -8, 14, 3))
+        pygame.draw.rect(screen, moon_core, scaled_rect(21, -13, 6, 6))
+        pygame.draw.rect(screen, armor_mid, scaled_rect(13, 4, 22, 18))
+        pygame.draw.rect(screen, armor_light, scaled_rect(16, 7, 16, 3))
+        pygame.draw.rect(screen, shadow, scaled_rect(17, 13, 14, 4))
+        pygame.draw.rect(screen, armor_dark, scaled_rect(10, 24, 28, 25))
+        pygame.draw.rect(screen, armor_mid, scaled_rect(13, 27, 22, 18))
+        pygame.draw.rect(screen, moon_glow, scaled_rect(18, 29, 12, 12), 1)
+        pygame.draw.rect(screen, moon_core, scaled_rect(20, 31, 8, 8))
+        pygame.draw.rect(screen, armor_light, scaled_rect(5, 25, 8, 10))
+        pygame.draw.rect(screen, armor_light, scaled_rect(35, 25, 8, 10))
+
+        if self.menu_facing == 1:
+            front_arm = scaled_rect(37, 35, 7, 18)
+            back_arm = scaled_rect(4, 35, 6, 15)
+        else:
+            front_arm = scaled_rect(4, 35, 7, 18)
+            back_arm = scaled_rect(38, 35, 6, 15)
+
+        pygame.draw.rect(screen, armor_mid, back_arm)
+        pygame.draw.rect(screen, armor_light, front_arm)
+        pygame.draw.rect(screen, armor_dark, scaled_rect(12, 49, 9, 15))
+        pygame.draw.rect(screen, armor_dark, scaled_rect(27, 49, 9, 15))
+        pygame.draw.rect(screen, armor_light, scaled_rect(12, 60, 10, 4))
+        pygame.draw.rect(screen, armor_light, scaled_rect(27, 60, 10, 4))
+        pygame.draw.rect(screen, shadow, rect, 1)
 
     def _draw_eye_glow(self, screen, character_rect):
         direction = pygame.Vector2(
@@ -119,7 +166,7 @@ class MainMenu:
         eye_shift_y = max(-3, min(3, int(direction.y * 3)))
         eye_y = character_rect.y + 17 + eye_shift_y
 
-        if self.menu_player.facing == 1:
+        if self.menu_facing == 1:
             eye_x = character_rect.x + 34 + eye_shift_x
         else:
             eye_x = character_rect.x + 28 + eye_shift_x

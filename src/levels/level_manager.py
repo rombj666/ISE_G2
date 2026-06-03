@@ -2742,6 +2742,7 @@ class LevelManager:
         self.map5_moon_altar_used = False
         self.map7_moon_altar_rect = pygame.Rect(1245, 536, 82, 68)
         self.map7_moon_altar_used = False
+        self.background_draw_callback = None
 
         # CSV/PNG Tiled map loading for Map 0 (your part)
         self.csv_tile_surfaces = []
@@ -3393,10 +3394,10 @@ class LevelManager:
                     {
                         "rect": pygame.Rect(11380, 550, DOOR_WIDTH, DOOR_HEIGHT),
                         "target_map": 1,
-                        "label": "Boss Arena",
+                        "label": "Lower Sanctuary",
                     }
                 ],
-                enemy_spawns=[(7000, 590)],                # Combat Courtyard center
+                enemy_spawns=[],
                 fulcrums=[
                     {
                         "rect": pygame.Rect(9620, 540, FULCRUM_RADIUS * 2, FULCRUM_RADIUS * 2),
@@ -3459,8 +3460,8 @@ class LevelManager:
             [
                 {
                     "rect": pygame.Rect(MAP_1_WIDTH - 120, 550, DOOR_WIDTH, DOOR_HEIGHT),
-                    "target_map": 2,
-                    "label": "Resting Area",
+                    "target_map": 8,
+                    "label": "Lunar Core",
                 }
             ],
             boss_spawn=(MAP_1_WIDTH // 2, 590),
@@ -3481,12 +3482,19 @@ class LevelManager:
         doors = tiled["doors"] or [
             {
                 "rect": pygame.Rect(MAP_1_WIDTH - 70, 120, 70, 180),
-                "target_map": 2,
-                "label": "Level 2",
+                "target_map": 8,
+                "label": "Lunar Core",
                 "visible": False,
                 "auto": True,
             }
         ]
+        doors = [door.copy() for door in doors]
+        for door in doors:
+            if door.get("target_map") == 2:
+                door["target_map"] = 8
+                door["label"] = "Lunar Core"
+                if door.get("auto", False) or door.get("visible", True) is False:
+                    door["prompt"] = "Press E to enter Lunar Core"
         map1_shop_rect = tiled["shop_rect"] or pygame.Rect(520, 506, 150, 90)
         return GameMap(
             1,
@@ -3561,8 +3569,6 @@ class LevelManager:
         player.hp = player.current_hp
         player.current_mana = player.max_mana
         player.mana = player.current_mana
-        player.current_stamina = player.max_stamina
-        player.stamina_recover_delay_timer = 0
         player.invincible_timer = 0
         self._set_current_moon_altar_used()
         return True
@@ -3863,6 +3869,9 @@ class LevelManager:
                 draw_section5_science_buildings(screen, camera)
                 draw_section6_courtyard_buildings(screen, camera)
                 draw_section8_collapsed_city_background(screen, camera)
+
+        if self.background_draw_callback is not None:
+            self.background_draw_callback(screen, camera)
 
         # 4. Draw Tiled CSV/PNG map (YOUR TILED MAP - placed behind platforms)
         self.draw_tiled_map(screen, camera)

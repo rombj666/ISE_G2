@@ -58,7 +58,6 @@ class Shop:
             self.make_skill("time_freeze", "Time Freeze"),
             self.make_skill("orbit_blades", "Orbit Blades"),
             self.make_skill("energy_beam", "Energy Beam"),
-            self.make_skill("execute_strike", "Execute Strike"),
             self.make_skill("soul_anchor", "Soul Anchor"),
             {
                 "id": "heal_hp",
@@ -255,7 +254,6 @@ class Shop:
             "Time Freeze": "Freeze",
             "Orbit Blades": "Orbit",
             "Energy Beam": "Beam",
-            "Execute Strike": "Execute",
             "Soul Anchor": "Anchor",
             "Heal HP": "Heal",
             "Restore Mana": "Mana",

@@ -23,7 +23,6 @@ def draw_player_ui(screen, player, room_name=None):
     x = 20
     hp_y = 20
     mana_y = 58
-    stamina_y = 88
 
     draw_bar(
         screen,
@@ -51,27 +50,6 @@ def draw_player_ui(screen, player, room_name=None):
     mana_text = small_font.render(f"Mana: {player.current_mana} / {player.max_mana}", True, (255, 255, 255))
     screen.blit(mana_text, (x + 8, mana_y - 1))
 
-    stamina_color = (80, 220, 110)
-    if player.current_stamina < player.max_stamina * 0.35:
-        stamina_color = (240, 210, 70)
-
-    draw_bar(
-        screen,
-        x,
-        stamina_y,
-        HP_BAR_WIDTH,
-        MANA_BAR_HEIGHT,
-        player.current_stamina,
-        player.max_stamina,
-        stamina_color,
-    )
-    stamina_text = small_font.render(
-        f"Stamina: {round(player.current_stamina)} / {player.max_stamina}",
-        True,
-        (255, 255, 255),
-    )
-    screen.blit(stamina_text, (x + 8, stamina_y - 1))
-
     weapon = get_weapon(player.current_weapon_id)
     skill = get_skill(player.current_skill_id)
     coins_text = small_font.render(f"Coins: {player.coins}", True, (255, 230, 120))
@@ -86,9 +64,7 @@ def draw_player_ui(screen, player, room_name=None):
     skill_status_text = small_font.render(skill_status, True, (230, 230, 230))
 
     if weapon["id"] == "shield_weapon":
-        if player.guard_broken_timer > 0:
-            status = "Block: Guard Broken"
-        elif player.is_blocking:
+        if player.is_blocking:
             status = "Block: Active"
         else:
             status = "Block: Ready"
@@ -117,20 +93,20 @@ def draw_player_ui(screen, player, room_name=None):
     status_text = small_font.render(status, True, (230, 230, 230))
     special_text = small_font.render(special_status, True, (230, 230, 230))
 
-    screen.blit(coins_text, (x, 118))
-    screen.blit(weapon_text, (x, 144))
-    screen.blit(skill_text, (x, 170))
-    screen.blit(skill_status_text, (x, 196))
-    screen.blit(status_text, (x, 222))
-    screen.blit(special_text, (x, 248))
+    screen.blit(coins_text, (x, 92))
+    screen.blit(weapon_text, (x, 118))
+    screen.blit(skill_text, (x, 144))
+    screen.blit(skill_status_text, (x, 170))
+    screen.blit(status_text, (x, 196))
+    screen.blit(special_text, (x, 222))
 
     if player.soul_anchor_active:
         anchor_text = small_font.render(f"Anchor: {player.soul_anchor_timer:.1f}s", True, (120, 255, 180))
-        screen.blit(anchor_text, (x, 274))
+        screen.blit(anchor_text, (x, 248))
 
     if room_name is not None:
         room_text = small_font.render(f"Room: {room_name}", True, (230, 230, 230))
-        screen.blit(room_text, (x, 304))
+        screen.blit(room_text, (x, 278))
 
     if DEBUG_MODE:
         hp_status = "ON" if player.debug_unlimited_hp else "OFF"
@@ -183,8 +159,8 @@ def draw_weapon_boxes(screen, player):
 
 def draw_skill_boxes(screen, player):
     font = pygame.font.Font(None, 22)
-    skill_ids = ["time_freeze", "orbit_blades", "energy_beam", "execute_strike", "soul_anchor"]
-    labels = ["6 Freeze", "7 Orbit", "8 Beam", "9 Execute", "0 Anchor"]
+    skill_ids = ["time_freeze", "orbit_blades", "energy_beam", "soul_anchor"]
+    labels = ["6 Freeze", "7 Orbit", "8 Beam", "9 Anchor"]
     box_width = 104
     box_height = 32
     gap = 8

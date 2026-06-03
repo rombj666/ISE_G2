@@ -15,4 +15,5 @@
 | 6-0 | Test skill switch |
 | F1 | Toggle unlimited HP |
 | F2 | Toggle unlimited mana |
+| F3 | Toggle player coordinate debug overlay |
 | ESC | Pause / close menu |

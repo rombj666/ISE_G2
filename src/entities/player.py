@@ -4,13 +4,67 @@ from pathlib import Path
 import pygame
 from src.utils.animation import load_libresprite_animation, Animation
 
+from src.systems.animation import load_fixed_frame_sheet
 from settings import (
     AUTO_GRAPPLE_ARC_HEIGHT,
     AUTO_GRAPPLE_DURATION,
     DEBUG_UNLIMITED_HP,
     DEBUG_UNLIMITED_MANA,
     GRAVITY,
-    GUARD_BREAK_TIME,
+    GRAPPLE_ANIM_OFFSET_X,
+    GRAPPLE_ANIM_OFFSET_Y,
+    GRAPPLE_ATTACK_ANIMATION_SPEED,
+    GRAPPLE_ATTACK_FRAME_COUNT,
+    GRAPPLE_ATTACK_OFFSET_X,
+    GRAPPLE_ATTACK_OFFSET_Y,
+    GRAPPLE_ATTACK_TARGET_HEIGHT,
+    GRAPPLE_ATTACK_TARGET_WIDTH,
+    GRAPPLE_DASH_ANIMATION_SPEED,
+    GRAPPLE_DASH_FRAME_COUNT,
+    GRAPPLE_IDLE_ANIMATION_SPEED,
+    GRAPPLE_IDLE_FRAME_COUNT,
+    GRAPPLE_JUMP_ANIMATION_SPEED,
+    GRAPPLE_JUMP_FRAME_COUNT,
+    GRAPPLE_PLAYER_TARGET_HEIGHT,
+    GRAPPLE_PLAYER_TARGET_WIDTH,
+    GRAPPLE_WALK_ANIMATION_SPEED,
+    GRAPPLE_WALK_FRAME_COUNT,
+    HEAVY_ATTACK_ANIMATION_SPEED,
+    HEAVY_ATTACK_FRAME_COUNT,
+    HEAVY_ATTACK_OFFSET_X,
+    HEAVY_ATTACK_OFFSET_Y,
+    HEAVY_ATTACK_TARGET_HEIGHT,
+    HEAVY_ATTACK_TARGET_WIDTH,
+    HEAVY_ANIM_OFFSET_X,
+    HEAVY_ANIM_OFFSET_Y,
+    HEAVY_DASH_ANIMATION_SPEED,
+    HEAVY_DASH_FRAME_COUNT,
+    HEAVY_IDLE_ANIMATION_SPEED,
+    HEAVY_IDLE_FRAME_COUNT,
+    HEAVY_JUMP_ANIMATION_SPEED,
+    HEAVY_JUMP_FRAME_COUNT,
+    HEAVY_PLAYER_TARGET_HEIGHT,
+    HEAVY_PLAYER_TARGET_WIDTH,
+    HEAVY_WALK_ANIMATION_SPEED,
+    HEAVY_WALK_FRAME_COUNT,
+    LIGHT_ATTACK_ANIMATION_SPEED,
+    LIGHT_ATTACK_FRAME_COUNT,
+    LIGHT_ATTACK_OFFSET_X,
+    LIGHT_ATTACK_OFFSET_Y,
+    LIGHT_ATTACK_TARGET_HEIGHT,
+    LIGHT_ATTACK_TARGET_WIDTH,
+    LIGHT_ANIM_OFFSET_X,
+    LIGHT_ANIM_OFFSET_Y,
+    LIGHT_DASH_ANIMATION_SPEED,
+    LIGHT_DASH_FRAME_COUNT,
+    LIGHT_IDLE_ANIMATION_SPEED,
+    LIGHT_IDLE_FRAME_COUNT,
+    LIGHT_JUMP_ANIMATION_SPEED,
+    LIGHT_JUMP_FRAME_COUNT,
+    LIGHT_PLAYER_TARGET_HEIGHT,
+    LIGHT_PLAYER_TARGET_WIDTH,
+    LIGHT_WALK_ANIMATION_SPEED,
+    LIGHT_WALK_FRAME_COUNT,
     NORMAL_PARRY_ACTIVE_TIME,
     NORMAL_PARRY_COOLDOWN,
     PLAYER_BONUS_ATTACK_PERCENT,
@@ -24,18 +78,112 @@ from settings import (
     PLAYER_MAX_HP,
     PLAYER_MAX_MANA,
     PLAYER_SPEED,
-    STAMINA_BLOCK_DRAIN_PER_SECOND,
-    STAMINA_BLOCK_HIT_COST,
-    STAMINA_MAX,
-    STAMINA_RECOVER_DELAY,
-    STAMINA_RECOVER_DELAY_AFTER_HIT,
-    STAMINA_RECOVER_PER_SECOND,
+    SHIELD_ANIM_OFFSET_X,
+    SHIELD_ANIM_OFFSET_Y,
+    SHIELD_ATTACK_ANIMATION_SPEED,
+    SHIELD_ATTACK_FRAME_COUNT,
+    SHIELD_ATTACK_OFFSET_X,
+    SHIELD_ATTACK_OFFSET_Y,
+    SHIELD_ATTACK_TARGET_HEIGHT,
+    SHIELD_ATTACK_TARGET_WIDTH,
+    SHIELD_DASH_ANIMATION_SPEED,
+    SHIELD_DASH_FRAME_COUNT,
+    SHIELD_IDLE_ANIMATION_SPEED,
+    SHIELD_IDLE_FRAME_COUNT,
+    SHIELD_JUMP_ANIMATION_SPEED,
+    SHIELD_JUMP_FRAME_COUNT,
+    SHIELD_PLAYER_TARGET_HEIGHT,
+    SHIELD_PLAYER_TARGET_WIDTH,
+    SHIELD_WALK_ANIMATION_SPEED,
+    SHIELD_WALK_FRAME_COUNT,
+    SHOOTER_ANIM_OFFSET_X,
+    SHOOTER_ANIM_OFFSET_Y,
+    SHOOTER_ATTACK_ANIMATION_SPEED,
+    SHOOTER_ATTACK_FRAME_COUNT,
+    SHOOTER_ATTACK_OFFSET_X,
+    SHOOTER_ATTACK_OFFSET_Y,
+    SHOOTER_ATTACK_TARGET_HEIGHT,
+    SHOOTER_ATTACK_TARGET_WIDTH,
+    SHOOTER_DASH_ANIMATION_SPEED,
+    SHOOTER_DASH_FRAME_COUNT,
+    SHOOTER_IDLE_ANIMATION_SPEED,
+    SHOOTER_IDLE_FRAME_COUNT,
+    SHOOTER_JUMP_ANIMATION_SPEED,
+    SHOOTER_JUMP_FRAME_COUNT,
+    SHOOTER_PLAYER_TARGET_HEIGHT,
+    SHOOTER_PLAYER_TARGET_WIDTH,
+    SHOOTER_WALK_ANIMATION_SPEED,
+    SHOOTER_WALK_FRAME_COUNT,
 )
 from src.systems.skills import get_skill
 from src.systems.weapons import get_weapon
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LIGHT_WEAPON_IMAGE_PATH = PROJECT_ROOT / "assets" / "weapons" / "light_weapon.png"
+PROCESSED_ANIMATION_ROOT = PROJECT_ROOT / "assets" / "processed" / "animations"
+PROCESSED_WEAPON_ROOT = PROJECT_ROOT / "assets" / "processed" / "weapons"
+DEBUG_ATTACK_ANIMATION = True
+DEBUG_JUMP_ANIMATION = True
+LIGHT_WEAPON_IDLE_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "light_weapon_idle_clean.png"
+LIGHT_WEAPON_WALK_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "light_weapon_walk_clean.png"
+LIGHT_WEAPON_JUMP_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "light_weapon_jump_clean.png"
+LIGHT_WEAPON_DASH_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "light_weapon_dash_clean.png"
+LIGHT_ATTACK_SHEET_PATH = PROCESSED_WEAPON_ROOT / "light_attack_clean.png"
+HEAVY_WEAPON_IDLE_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "heavy_weapon_idle_clean.png"
+HEAVY_WEAPON_WALK_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "heavy_weapon_walk_clean.png"
+HEAVY_WEAPON_JUMP_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "heavy_weapon_jump_clean.png"
+HEAVY_WEAPON_DASH_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "heavy_weapon_dash_clean.png"
+HEAVY_ATTACK_SHEET_PATH = PROCESSED_WEAPON_ROOT / "heavy_attack_clean.png"
+SHOOTER_WEAPON_IDLE_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shooter_weapon_idle_clean.png"
+SHOOTER_WEAPON_WALK_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shooter_weapon_walk_clean.png"
+SHOOTER_WEAPON_JUMP_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shooter_weapon_jump_clean.png"
+SHOOTER_WEAPON_DASH_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shooter_weapon_dash_clean.png"
+SHOOTER_ATTACK_SHEET_PATH = PROCESSED_WEAPON_ROOT / "shooter_attack_clean.png"
+SHIELD_WEAPON_IDLE_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shield_weapon_idle_clean.png"
+SHIELD_WEAPON_WALK_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shield_weapon_walk_clean.png"
+SHIELD_WEAPON_JUMP_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shield_weapon_jump_clean.png"
+SHIELD_WEAPON_DASH_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "shield_weapon_dash_clean.png"
+SHIELD_ATTACK_SHEET_PATH = PROCESSED_WEAPON_ROOT / "shield_attack_clean.png"
+GRAPPLE_WEAPON_IDLE_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "grapple_weapon_idle_clean.png"
+GRAPPLE_WEAPON_WALK_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "grapple_weapon_walk_clean.png"
+GRAPPLE_WEAPON_JUMP_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "grapple_weapon_jump_clean.png"
+GRAPPLE_WEAPON_DASH_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "grapple_weapon_dash_clean.png"
+GRAPPLE_ATTACK_SHEET_PATH = PROCESSED_WEAPON_ROOT / "grapple_attack_clean.png"
+LIGHT_WEAPON_ATTACK_DURATION = 0.12
+ATTACK_FRAME_CANVAS_SIZES = {
+    "light": (320, 220),
+    "heavy": (360, 240),
+    "shooter": (300, 220),
+    "shield": (320, 220),
+    "grapple": (420, 240),
+}
+MOVEMENT_FRAME_CANVAS_SIZES = {
+    ("light", "idle"): (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+    ("light", "walk"): (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+    ("light", "jump"): (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+    ("light", "dash"): (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+    ("heavy", "idle"): (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+    ("heavy", "walk"): (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+    ("heavy", "jump"): (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+    ("heavy", "dash"): (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+    ("shooter", "idle"): (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+    ("shooter", "walk"): (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+    ("shooter", "jump"): (300, 260),
+    ("shooter", "dash"): (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+    ("shield", "idle"): (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+    ("shield", "walk"): (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+    ("shield", "jump"): (300, 260),
+    ("shield", "dash"): (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+    ("grapple", "idle"): (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+    ("grapple", "walk"): (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+    ("grapple", "jump"): (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+    ("grapple", "dash"): (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+}
+MANUAL_JUMP_RECTS_ACTIVE = {
+    "shooter": True,
+    "shield": True,
+}
 
 
 class Player:
@@ -76,11 +224,7 @@ class Player:
         self.soul_anchor_pos = None
         self.soul_anchor_timer = 0
 
-        self.max_stamina = STAMINA_MAX
-        self.current_stamina = STAMINA_MAX
         self.is_blocking = False
-        self.guard_broken_timer = 0
-        self.stamina_recover_delay_timer = 0
 
         self.is_parrying = False
         self.parry_timer = 0
@@ -108,11 +252,244 @@ class Player:
 
         self.is_attacking = False
         self.attack_timer = 0
+        self.attack_visual_duration = LIGHT_WEAPON_ATTACK_DURATION
         self.attack_cooldown_timer = 0
         self.attack_hitbox = pygame.Rect(0, 0, 1, 1)
         self.attack_has_hit = False
         self.should_spawn_projectile = False
         self.has_active_shield_throw = False
+        self.light_weapon_image = self.load_light_weapon_image()
+        def load_weapon_sheet(
+            path,
+            frame_count,
+            target_size,
+            debug_name=None,
+            **_unused_preprocess_options,
+        ):
+            return load_fixed_frame_sheet(
+                path,
+                frame_count,
+                target_size[0],
+                target_size[1],
+                debug_name=debug_name,
+            )
+
+        self.light_weapon_idle_frames = load_weapon_sheet(
+            LIGHT_WEAPON_IDLE_SHEET_PATH,
+            LIGHT_IDLE_FRAME_COUNT,
+            (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+            padding=6,
+        )
+        self.light_weapon_walk_frames = load_weapon_sheet(
+            LIGHT_WEAPON_WALK_SHEET_PATH,
+            LIGHT_WALK_FRAME_COUNT,
+            (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+            padding=6,
+        )
+        self.light_weapon_jump_frames = load_weapon_sheet(
+            LIGHT_WEAPON_JUMP_SHEET_PATH,
+            LIGHT_JUMP_FRAME_COUNT,
+            (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+        )
+        self.light_weapon_dash_frames = load_weapon_sheet(
+            LIGHT_WEAPON_DASH_SHEET_PATH,
+            LIGHT_DASH_FRAME_COUNT,
+            (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+        )
+        self.light_weapon_attack_frames = load_weapon_sheet(
+            LIGHT_ATTACK_SHEET_PATH,
+            LIGHT_ATTACK_FRAME_COUNT,
+            ATTACK_FRAME_CANVAS_SIZES["light"],
+            debug_name="light attack",
+        )
+        if self.light_weapon_attack_frames:
+            print("Light attack final canvas size:", self.light_weapon_attack_frames[0].get_size())
+        self.heavy_weapon_idle_frames = load_weapon_sheet(
+            HEAVY_WEAPON_IDLE_SHEET_PATH,
+            HEAVY_IDLE_FRAME_COUNT,
+            (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+        )
+        self.heavy_weapon_walk_frames = load_weapon_sheet(
+            HEAVY_WEAPON_WALK_SHEET_PATH,
+            HEAVY_WALK_FRAME_COUNT,
+            (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+            padding=6,
+        )
+        self.heavy_weapon_jump_frames = load_weapon_sheet(
+            HEAVY_WEAPON_JUMP_SHEET_PATH,
+            HEAVY_JUMP_FRAME_COUNT,
+            (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+        )
+        self.heavy_weapon_dash_frames = load_weapon_sheet(
+            HEAVY_WEAPON_DASH_SHEET_PATH,
+            HEAVY_DASH_FRAME_COUNT,
+            (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+        )
+        self.heavy_weapon_attack_frames = load_weapon_sheet(
+            HEAVY_ATTACK_SHEET_PATH,
+            HEAVY_ATTACK_FRAME_COUNT,
+            ATTACK_FRAME_CANVAS_SIZES["heavy"],
+            debug_name="heavy attack",
+        )
+        self.shooter_weapon_idle_frames = load_weapon_sheet(
+            SHOOTER_WEAPON_IDLE_SHEET_PATH,
+            SHOOTER_IDLE_FRAME_COUNT,
+            (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+        )
+        self.shooter_weapon_walk_frames = load_weapon_sheet(
+            SHOOTER_WEAPON_WALK_SHEET_PATH,
+            SHOOTER_WALK_FRAME_COUNT,
+            (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+        )
+        self.shooter_weapon_jump_frames = load_weapon_sheet(
+            SHOOTER_WEAPON_JUMP_SHEET_PATH,
+            SHOOTER_JUMP_FRAME_COUNT,
+            MOVEMENT_FRAME_CANVAS_SIZES[("shooter", "jump")],
+            debug_name="shooter jump",
+        )
+        self.shooter_weapon_dash_frames = load_weapon_sheet(
+            SHOOTER_WEAPON_DASH_SHEET_PATH,
+            SHOOTER_DASH_FRAME_COUNT,
+            (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+        )
+        self.shooter_weapon_attack_frames = load_weapon_sheet(
+            SHOOTER_ATTACK_SHEET_PATH,
+            SHOOTER_ATTACK_FRAME_COUNT,
+            ATTACK_FRAME_CANVAS_SIZES["shooter"],
+            debug_name="shooter attack",
+        )
+        if self.shooter_weapon_attack_frames:
+            print("Shooter attack final canvas size:", self.shooter_weapon_attack_frames[0].get_size())
+
+        self.shield_weapon_idle_frames = load_weapon_sheet(
+            SHIELD_WEAPON_IDLE_SHEET_PATH,
+            SHIELD_IDLE_FRAME_COUNT,
+            (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+        )
+        self.shield_weapon_walk_frames = load_weapon_sheet(
+            SHIELD_WEAPON_WALK_SHEET_PATH,
+            SHIELD_WALK_FRAME_COUNT,
+            (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+        )
+        self.shield_weapon_jump_frames = load_weapon_sheet(
+            SHIELD_WEAPON_JUMP_SHEET_PATH,
+            SHIELD_JUMP_FRAME_COUNT,
+            MOVEMENT_FRAME_CANVAS_SIZES[("shield", "jump")],
+            debug_name="shield jump",
+        )
+        self.shield_weapon_dash_frames = load_weapon_sheet(
+            SHIELD_WEAPON_DASH_SHEET_PATH,
+            SHIELD_DASH_FRAME_COUNT,
+            (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+        )
+        self.shield_weapon_attack_frames = load_weapon_sheet(
+            SHIELD_ATTACK_SHEET_PATH,
+            SHIELD_ATTACK_FRAME_COUNT,
+            ATTACK_FRAME_CANVAS_SIZES["shield"],
+            debug_name="shield attack",
+        )
+        if self.shield_weapon_attack_frames:
+            print("Shield attack final canvas size:", self.shield_weapon_attack_frames[0].get_size())
+
+        self.grapple_weapon_idle_frames = load_weapon_sheet(
+            GRAPPLE_WEAPON_IDLE_SHEET_PATH,
+            GRAPPLE_IDLE_FRAME_COUNT,
+            (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+        )
+        self.grapple_weapon_walk_frames = load_weapon_sheet(
+            GRAPPLE_WEAPON_WALK_SHEET_PATH,
+            GRAPPLE_WALK_FRAME_COUNT,
+            (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+        )
+        self.grapple_weapon_jump_frames = load_weapon_sheet(
+            GRAPPLE_WEAPON_JUMP_SHEET_PATH,
+            GRAPPLE_JUMP_FRAME_COUNT,
+            (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+        )
+        self.grapple_weapon_dash_frames = load_weapon_sheet(
+            GRAPPLE_WEAPON_DASH_SHEET_PATH,
+            GRAPPLE_DASH_FRAME_COUNT,
+            (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+        )
+        self.grapple_weapon_attack_frames = load_weapon_sheet(
+            GRAPPLE_ATTACK_SHEET_PATH,
+            GRAPPLE_ATTACK_FRAME_COUNT,
+            ATTACK_FRAME_CANVAS_SIZES["grapple"],
+            debug_name="grapple attack",
+        )
+        if self.grapple_weapon_attack_frames:
+            print("Grapple attack final canvas size:", self.grapple_weapon_attack_frames[0].get_size())
+
+        self.print_jump_animation_debug_summary()
+
+        self.light_idle_index = 0
+        self.light_idle_timer = 0
+        self.light_walk_index = 0
+        self.light_walk_timer = 0
+        self.light_jump_index = 0
+        self.light_jump_timer = 0
+        self.light_dash_index = 0
+        self.light_dash_timer = 0
+        self.heavy_idle_index = 0
+        self.heavy_idle_timer = 0
+        self.heavy_walk_index = 0
+        self.heavy_walk_timer = 0
+        self.heavy_jump_index = 0
+        self.heavy_jump_timer = 0
+        self.heavy_dash_index = 0
+        self.heavy_dash_timer = 0
+        self.shooter_idle_index = 0
+        self.shooter_idle_timer = 0
+        self.shooter_walk_index = 0
+        self.shooter_walk_timer = 0
+        self.shooter_jump_index = 0
+        self.shooter_jump_timer = 0
+        self.shooter_dash_index = 0
+        self.shooter_dash_timer = 0
+        self.shield_idle_index = 0
+        self.shield_idle_timer = 0
+        self.shield_walk_index = 0
+        self.shield_walk_timer = 0
+        self.shield_jump_index = 0
+        self.shield_jump_timer = 0
+        self.shield_dash_index = 0
+        self.shield_dash_timer = 0
+        self.grapple_idle_index = 0
+        self.grapple_idle_timer = 0
+        self.grapple_walk_index = 0
+        self.grapple_walk_timer = 0
+        self.grapple_jump_index = 0
+        self.grapple_jump_timer = 0
+        self.grapple_dash_index = 0
+        self.grapple_dash_timer = 0
+        self.attack_animation_frames = []
+        self.attack_animation_index = 0
+        self.attack_animation_timer = 0
+        self.attack_animation_playing = False
+        self.attack_animation_flip = False
+        self.attack_animation_speed = LIGHT_ATTACK_ANIMATION_SPEED
+        self.attack_animation_weapon_id = None
+        self.last_jump_animation_debug_state = None
+        self.light_anim_offset_x = LIGHT_ANIM_OFFSET_X
+        self.light_anim_offset_y = LIGHT_ANIM_OFFSET_Y
+        self.light_attack_offset_x = LIGHT_ATTACK_OFFSET_X
+        self.light_attack_offset_y = LIGHT_ATTACK_OFFSET_Y
+        self.heavy_anim_offset_x = HEAVY_ANIM_OFFSET_X
+        self.heavy_anim_offset_y = HEAVY_ANIM_OFFSET_Y
+        self.heavy_attack_offset_x = HEAVY_ATTACK_OFFSET_X
+        self.heavy_attack_offset_y = HEAVY_ATTACK_OFFSET_Y
+        self.shooter_anim_offset_x = SHOOTER_ANIM_OFFSET_X
+        self.shooter_anim_offset_y = SHOOTER_ANIM_OFFSET_Y
+        self.shooter_attack_offset_x = SHOOTER_ATTACK_OFFSET_X
+        self.shooter_attack_offset_y = SHOOTER_ATTACK_OFFSET_Y
+        self.shield_anim_offset_x = SHIELD_ANIM_OFFSET_X
+        self.shield_anim_offset_y = SHIELD_ANIM_OFFSET_Y
+        self.shield_attack_offset_x = SHIELD_ATTACK_OFFSET_X
+        self.shield_attack_offset_y = SHIELD_ATTACK_OFFSET_Y
+        self.grapple_anim_offset_x = GRAPPLE_ANIM_OFFSET_X
+        self.grapple_anim_offset_y = GRAPPLE_ANIM_OFFSET_Y
+        self.grapple_attack_offset_x = GRAPPLE_ATTACK_OFFSET_X
+        self.grapple_attack_offset_y = GRAPPLE_ATTACK_OFFSET_Y
 
         self.invincible_timer = 0
         self.is_dead = False
@@ -129,8 +506,36 @@ class Player:
         self.dash_start_x = 0
         self.last_vel_x = 0
 
-        self.load_all_animations()
         self.play_idle_animation()
+
+    def load_light_weapon_image(self):
+        if not LIGHT_WEAPON_IMAGE_PATH.exists():
+            return None
+
+        try:
+            image = pygame.image.load(str(LIGHT_WEAPON_IMAGE_PATH)).convert_alpha()
+        except (pygame.error, OSError):
+            return None
+
+        target_height = 28
+        scale = target_height / image.get_height()
+        target_size = (max(1, int(image.get_width() * scale)), target_height)
+        return pygame.transform.smoothscale(image, target_size)
+
+    def print_jump_animation_debug_summary(self):
+        print("Shooter jump path:", SHOOTER_WEAPON_JUMP_SHEET_PATH)
+        print("Shooter jump exists:", SHOOTER_WEAPON_JUMP_SHEET_PATH.exists())
+        print("Shooter jump frames loaded:", len(self.shooter_weapon_jump_frames))
+        if self.shooter_weapon_jump_frames:
+            print("Shooter jump first frame size:", self.shooter_weapon_jump_frames[0].get_size())
+        print("Shield jump path:", SHIELD_WEAPON_JUMP_SHEET_PATH)
+        print("Shield jump exists:", SHIELD_WEAPON_JUMP_SHEET_PATH.exists())
+        print("Shield jump frames loaded:", len(self.shield_weapon_jump_frames))
+        if self.shield_weapon_jump_frames:
+            print("Shield jump first frame size:", self.shield_weapon_jump_frames[0].get_size())
+        print("Current source folder used:", PROCESSED_ANIMATION_ROOT)
+        print("Manual jump rects active for shooter:", MANUAL_JUMP_RECTS_ACTIVE["shooter"])
+        print("Manual jump rects active for shield:", MANUAL_JUMP_RECTS_ACTIVE["shield"])
 
     def handle_input(self, keys):
         if self.is_dead:
@@ -159,8 +564,6 @@ class Player:
         if keys[pygame.K_8]:
             self.switch_skill("energy_beam")
         if keys[pygame.K_9]:
-            self.switch_skill("execute_strike")
-        if keys[pygame.K_0]:
             self.switch_skill("soul_anchor")
 
         moving_left = keys[pygame.K_a] or keys[pygame.K_LEFT]
@@ -283,9 +686,6 @@ class Player:
                 self.soul_anchor_timer = 0
 
     def start_dash(self):
-        if self.guard_broken_timer > 0:
-            return
-
         self.is_attacking = False
         self.current_action = "idle"
 
@@ -295,22 +695,25 @@ class Player:
         self.vel_y = 0
 
     def start_attack(self):
-        if self.guard_broken_timer > 0:
-            return
         if self.current_action == "attack_na1":
             return
 
         weapon = get_weapon(self.current_weapon_id)
         self.is_dashing = False
+        print("Current weapon id:", self.current_weapon_id)
+        print("Starting attack animation:", self.current_weapon_id)
+        print("is_blocking:", self.is_blocking)
+        weapon_visual_started = self.start_weapon_attack_animation(self.current_weapon_id)
 
-
-        anim = self.animations.get("attack_na1")
+        anim = None if weapon_visual_started else self.animations.get("attack_na1")
         if anim:
             anim.reset()
             anim.loop = False
             self.current_animation = anim
             self.current_action = "attack_na1"
             self.attack_has_hit = False
+            self.attack_timer = LIGHT_WEAPON_ATTACK_DURATION
+            self.attack_visual_duration = LIGHT_WEAPON_ATTACK_DURATION
             self.attack_cooldown_timer = weapon["cooldown"]
             self.is_attacking = True
 
@@ -319,8 +722,13 @@ class Player:
             else:
                 self.attack_hitbox = self.get_attack_hitbox()
         else:
+            if weapon_visual_started:
+                self.current_animation = None
+                self.current_action = "weapon_attack"
+
             self.is_attacking = True
-            self.attack_timer = 0.12
+            self.attack_timer = LIGHT_WEAPON_ATTACK_DURATION
+            self.attack_visual_duration = LIGHT_WEAPON_ATTACK_DURATION
             self.attack_cooldown_timer = weapon["cooldown"]
             self.attack_has_hit = False
 
@@ -328,6 +736,70 @@ class Player:
                 self.should_spawn_projectile = True
             else:
                 self.attack_hitbox = self.get_attack_hitbox()
+
+    def normalize_weapon_id(self, weapon_id):
+        mapping = {
+            "light": "light",
+            "light_weapon": "light",
+            "heavy": "heavy",
+            "heavy_weapon": "heavy",
+            "shooter": "shooter",
+            "shooter_weapon": "shooter",
+            "shoot_weapon": "shooter",
+            "shield": "shield",
+            "shield_weapon": "shield",
+            "grapple": "grapple",
+            "grapple_weapon": "grapple",
+        }
+        return mapping.get(weapon_id, weapon_id)
+
+    def start_weapon_attack_animation(self, weapon_id):
+        weapon_key = self.normalize_weapon_id(weapon_id)
+
+        if weapon_key == "light":
+            frames = self.light_weapon_attack_frames
+            speed = LIGHT_ATTACK_ANIMATION_SPEED
+        elif weapon_key == "heavy":
+            frames = self.heavy_weapon_attack_frames
+            speed = HEAVY_ATTACK_ANIMATION_SPEED
+        elif weapon_key == "shooter":
+            frames = self.shooter_weapon_attack_frames
+            speed = SHOOTER_ATTACK_ANIMATION_SPEED
+        elif weapon_key == "shield":
+            frames = self.shield_weapon_attack_frames
+            speed = SHIELD_ATTACK_ANIMATION_SPEED
+        elif weapon_key == "grapple":
+            frames = self.grapple_weapon_attack_frames
+            speed = GRAPPLE_ATTACK_ANIMATION_SPEED
+        else:
+            print("Unknown attack weapon id:", self.current_weapon_id)
+            print("[ATTACK RESET] unknown weapon id")
+            self.attack_animation_playing = False
+            return False
+
+        if not frames:
+            print("No attack frames found for weapon:", self.current_weapon_id)
+            print("[ATTACK RESET] missing frames")
+            self.attack_animation_playing = False
+            return False
+
+        self.attack_animation_playing = True
+        self.attack_animation_weapon_id = weapon_key
+        self.attack_animation_frames = frames
+        self.attack_animation_index = 0
+        self.attack_animation_timer = 0
+        self.attack_animation_speed = speed
+        self.attack_animation_flip = self.facing == -1
+        if DEBUG_ATTACK_ANIMATION:
+            print("[ATTACK START]")
+            print("weapon:", self.current_weapon_id)
+            print("normalized:", weapon_key)
+            print("frames:", len(frames))
+            print("playing:", self.attack_animation_playing)
+            print("index:", self.attack_animation_index)
+            print("speed:", self.attack_animation_speed)
+            print("first frame size:", frames[0].get_size() if frames else None)
+        return True
 
     def get_attack_hitbox(self):
         weapon = get_weapon(self.current_weapon_id)
@@ -355,29 +827,13 @@ class Player:
         weapon = get_weapon(self.current_weapon_id)
 
         if weapon["id"] == "shield_weapon" and keys[pygame.K_l]:
-            can_block = self.current_stamina > 0 and self.guard_broken_timer <= 0
-
-            if can_block:
-                self.is_blocking = True
-                self.current_stamina -= STAMINA_BLOCK_DRAIN_PER_SECOND * dt
-                self.stamina_recover_delay_timer = STAMINA_RECOVER_DELAY
-
-                if self.current_stamina <= 0:
-                    self.current_stamina = 0
-                    self.is_blocking = False
-                    self.guard_broken_timer = GUARD_BREAK_TIME
-                return
+            self.is_blocking = True
+            return
 
         self.is_blocking = False
 
     def block_hit(self):
-        self.current_stamina -= STAMINA_BLOCK_HIT_COST
-        self.stamina_recover_delay_timer = STAMINA_RECOVER_DELAY_AFTER_HIT
-
-        if self.current_stamina <= 0:
-            self.current_stamina = 0
-            self.is_blocking = False
-            self.guard_broken_timer = GUARD_BREAK_TIME
+        self.is_blocking = True
 
     def take_damage(self, amount):
         if self.invincible_timer > 0 or self.is_dead:
@@ -574,6 +1030,7 @@ class Player:
 
     def update(self, dt, platforms, keys):
         self.update_timers(dt)
+        self.update_attack_animation(dt)
 
         if self.debug_unlimited_mana:
             self.current_mana = self.max_mana
@@ -591,7 +1048,6 @@ class Player:
             return
 
         self.update_blocking(keys, dt)
-        self.recover_stamina(dt)
 
         if self.is_attacking:
             self.attack_hitbox = self.get_attack_hitbox()
@@ -608,6 +1064,7 @@ class Player:
 
         self.move_x(platforms)
         self.move_y(platforms)
+        self.update_weapon_movement_animation(dt)
 
         self.update_animation(dt)
 
@@ -625,12 +1082,6 @@ class Player:
 
         if self.special_cooldown_timer > 0:
             self.special_cooldown_timer -= dt
-
-        if self.guard_broken_timer > 0:
-            self.guard_broken_timer -= dt
-
-        if self.stamina_recover_delay_timer > 0:
-            self.stamina_recover_delay_timer -= dt
 
         if self.parry_cooldown_timer > 0:
             self.parry_cooldown_timer -= dt
@@ -658,7 +1109,7 @@ class Player:
         #     print(f"on_ground: {self.on_ground}, vel_y: {self.vel_y}")
 
         if self.is_attacking:
-            self.update_attack_animation(dt)
+            self.update_player_sprite_attack_animation(dt)
         elif self.is_dashing:
             self.update_dash_animation(dt)
         elif not self.on_ground:
@@ -804,7 +1255,7 @@ class Player:
                     else:
                         self.play_idle_animation()
 
-    def update_attack_animation(self, dt):
+    def update_player_sprite_attack_animation(self, dt):
         """Update attack animation (non-looping)"""
         anim = self.current_animation
         if anim:
@@ -822,6 +1273,132 @@ class Player:
                     self.update_walk_animation(dt)
                 else:
                     self.play_idle_animation()
+
+    def update_attack_animation(self, dt):
+        if not self.attack_animation_playing:
+            return
+
+        if not self.attack_animation_frames:
+            print("[ATTACK RESET] no attack animation frames during update")
+            self.attack_animation_playing = False
+            return
+
+        if DEBUG_ATTACK_ANIMATION:
+            print(
+                "[ATTACK UPDATE]",
+                "index:", self.attack_animation_index,
+                "timer:", self.attack_animation_timer,
+            )
+
+        self.attack_animation_timer += dt
+        while self.attack_animation_timer >= self.attack_animation_speed:
+            self.attack_animation_timer -= self.attack_animation_speed
+            self.attack_animation_index += 1
+
+            if self.attack_animation_index >= len(self.attack_animation_frames):
+                self.attack_animation_playing = False
+                self.attack_animation_index = 0
+                self.attack_animation_timer = 0
+                self.attack_animation_frames = []
+                self.attack_animation_weapon_id = None
+                self.attack_animation_flip = False
+                print("[ATTACK FINISHED]")
+                return
+
+
+    def update_weapon_movement_animation(self, dt):
+        if self.attack_animation_playing:
+            return
+
+        visual_state = self.get_visual_state()
+        weapon_key = self.normalize_weapon_id(self.current_weapon_id)
+
+        if weapon_key in ("light", "heavy", "shooter", "shield", "grapple"):
+            if DEBUG_JUMP_ANIMATION and visual_state == "jump" and weapon_key in ("shooter", "shield"):
+                frames, _ = self.get_weapon_state_frames_and_speed(weapon_key, visual_state)
+                debug_state = (
+                    self.current_weapon_id,
+                    weapon_key,
+                    visual_state,
+                    len(frames),
+                    self.on_ground,
+                )
+                if debug_state != self.last_jump_animation_debug_state:
+                    print("[JUMP ANIMATION SELECT]")
+                    print("current weapon id:", self.current_weapon_id)
+                    print("normalized weapon key:", weapon_key)
+                    print("current movement state:", visual_state)
+                    print("jump animation selected:", True)
+                    print("jump frames available:", len(frames))
+                    self.last_jump_animation_debug_state = debug_state
+
+            self.update_weapon_state_animation(weapon_key, visual_state, dt)
+            return
+
+    def get_visual_state(self):
+        if self.attack_animation_playing:
+            return "attack"
+        if not self.on_ground:
+            return "jump"
+        if self.is_dashing:
+            return "dash"
+        if abs(self.vel_x) > 0.1:
+            return "walk"
+        return "idle"
+
+    def update_weapon_state_animation(self, weapon_prefix, visual_state, dt):
+        frames, speed = self.get_weapon_state_frames_and_speed(weapon_prefix, visual_state)
+        self.update_looping_animation(
+            dt,
+            frames,
+            f"{weapon_prefix}_{visual_state}_index",
+            f"{weapon_prefix}_{visual_state}_timer",
+            speed,
+        )
+
+    def update_looping_animation(self, dt, frames, index_attr, timer_attr, speed):
+        if not frames:
+            return
+
+        setattr(self, timer_attr, getattr(self, timer_attr) + dt)
+        if getattr(self, timer_attr) >= speed:
+            setattr(self, timer_attr, 0)
+            setattr(self, index_attr, (getattr(self, index_attr) + 1) % len(frames))
+
+    def get_weapon_state_frames_and_speed(self, weapon_prefix, visual_state):
+        animation_map = {
+            "light": {
+                "idle": (self.light_weapon_idle_frames, LIGHT_IDLE_ANIMATION_SPEED),
+                "walk": (self.light_weapon_walk_frames, LIGHT_WALK_ANIMATION_SPEED),
+                "jump": (self.light_weapon_jump_frames, LIGHT_JUMP_ANIMATION_SPEED),
+                "dash": (self.light_weapon_dash_frames, LIGHT_DASH_ANIMATION_SPEED),
+            },
+            "heavy": {
+                "idle": (self.heavy_weapon_idle_frames, HEAVY_IDLE_ANIMATION_SPEED),
+                "walk": (self.heavy_weapon_walk_frames, HEAVY_WALK_ANIMATION_SPEED),
+                "jump": (self.heavy_weapon_jump_frames, HEAVY_JUMP_ANIMATION_SPEED),
+                "dash": (self.heavy_weapon_dash_frames, HEAVY_DASH_ANIMATION_SPEED),
+            },
+            "shooter": {
+                "idle": (self.shooter_weapon_idle_frames, SHOOTER_IDLE_ANIMATION_SPEED),
+                "walk": (self.shooter_weapon_walk_frames, SHOOTER_WALK_ANIMATION_SPEED),
+                "jump": (self.shooter_weapon_jump_frames, SHOOTER_JUMP_ANIMATION_SPEED),
+                "dash": (self.shooter_weapon_dash_frames, SHOOTER_DASH_ANIMATION_SPEED),
+            },
+            "shield": {
+                "idle": (self.shield_weapon_idle_frames, SHIELD_IDLE_ANIMATION_SPEED),
+                "walk": (self.shield_weapon_walk_frames, SHIELD_WALK_ANIMATION_SPEED),
+                "jump": (self.shield_weapon_jump_frames, SHIELD_JUMP_ANIMATION_SPEED),
+                "dash": (self.shield_weapon_dash_frames, SHIELD_DASH_ANIMATION_SPEED),
+            },
+            "grapple": {
+                "idle": (self.grapple_weapon_idle_frames, GRAPPLE_IDLE_ANIMATION_SPEED),
+                "walk": (self.grapple_weapon_walk_frames, GRAPPLE_WALK_ANIMATION_SPEED),
+                "jump": (self.grapple_weapon_jump_frames, GRAPPLE_JUMP_ANIMATION_SPEED),
+                "dash": (self.grapple_weapon_dash_frames, GRAPPLE_DASH_ANIMATION_SPEED),
+            },
+        }
+        return animation_map[weapon_prefix].get(visual_state, ([], 0.1))
 
     def play_idle_animation(self):
 
@@ -841,17 +1418,6 @@ class Player:
         else:
             self.current_animation = None
             self.current_action = "idle"
-
-    def recover_stamina(self, dt):
-        if self.is_blocking:
-            return
-
-        if self.stamina_recover_delay_timer > 0:
-            return
-
-        if self.current_stamina < self.max_stamina:
-            self.current_stamina += STAMINA_RECOVER_PER_SECOND * dt
-            self.current_stamina = min(self.current_stamina, self.max_stamina)
 
     def move_x(self, platforms):
         move_amount = int(round(self.vel_x))
@@ -889,6 +1455,18 @@ class Player:
                     break
 
     def draw(self, screen, camera=None):
+        if self.draw_attack_animation(screen, camera):
+            return
+
+        if not self.on_ground and self.draw_weapon_specific_state_animation("jump", screen, camera):
+            return
+
+        if self.is_dashing and self.draw_weapon_specific_state_animation("dash", screen, camera):
+            return
+
+        if self.draw_custom_weapon_movement_animation(screen, camera):
+            return
+
         if self.current_animation:
             frame = self.current_animation.get_frame()
             if frame:
@@ -900,6 +1478,7 @@ class Player:
                     frame = pygame.transform.flip(frame, True, False)
 
                 screen.blit(frame, (draw_rect.x, draw_rect.y))
+                self.draw_light_weapon(screen, camera)
 
                 if self.is_blocking:
                     self.draw_block_effect(screen, camera)
@@ -907,9 +1486,7 @@ class Player:
                     self.draw_parry_effect(screen, camera)
                 return
 
-        if self.guard_broken_timer > 0:
-            color = (255, 180, 80)
-        elif self.invincible_timer > 0:
+        if self.invincible_timer > 0:
             color = (255, 255, 255)
         else:
             color = (180, 220, 255)
@@ -919,6 +1496,7 @@ class Player:
             draw_rect = camera.apply_rect(self.rect)
 
         self.draw_kael_template(screen, draw_rect, color)
+        self.draw_light_weapon(screen, camera)
 
         if self.is_blocking:
             self.draw_block_effect(screen, camera)
@@ -942,12 +1520,210 @@ class Player:
                 end_pos = camera.apply_pos(end_pos)
             pygame.draw.line(screen, (130, 210, 255), start_pos, end_pos, 2)
 
-        if self.soul_anchor_active and self.soul_anchor_pos is not None:
-            anchor_pos = self.soul_anchor_pos
-            if camera:
-                anchor_pos = camera.apply_pos(anchor_pos)
-            pygame.draw.circle(screen, (120, 255, 180), anchor_pos, 14, 3)
-            pygame.draw.circle(screen, (120, 255, 180), anchor_pos, 4)
+    def draw_attack_animation(self, screen, camera=None):
+        if not self.attack_animation_playing:
+            return False
+
+        if not self.attack_animation_frames:
+            return False
+
+        if DEBUG_ATTACK_ANIMATION:
+            print(
+                "[ATTACK DRAW CALL]",
+                "index:", self.attack_animation_index,
+                "frames:", len(self.attack_animation_frames),
+            )
+
+        frame_index = min(self.attack_animation_index, len(self.attack_animation_frames) - 1)
+        frame = self.attack_animation_frames[frame_index]
+        if self.attack_animation_flip:
+            frame = pygame.transform.flip(frame, True, False)
+
+        frame_rect = frame.get_rect()
+        frame_rect.midbottom = self.rect.midbottom
+        offset_x, offset_y = self.get_attack_animation_offset()
+        if self.facing == -1:
+            offset_x = -offset_x
+        frame_rect.x += offset_x
+        frame_rect.y += offset_y
+
+        if camera:
+            frame_rect = camera.apply_rect(frame_rect)
+
+        if DEBUG_ATTACK_ANIMATION:
+            print("[ATTACK DRAW FRAME]", "size:", frame.get_size(), "rect:", frame_rect)
+
+        screen.blit(frame, frame_rect)
+        return True
+
+    def get_attack_animation_offset(self):
+        if self.attack_animation_weapon_id == "light":
+            return self.light_attack_offset_x, self.light_attack_offset_y
+        if self.attack_animation_weapon_id == "heavy":
+            return self.heavy_attack_offset_x, self.heavy_attack_offset_y
+        if self.attack_animation_weapon_id == "shooter":
+            return self.shooter_attack_offset_x, self.shooter_attack_offset_y
+        if self.attack_animation_weapon_id == "shield":
+            return self.shield_attack_offset_x, self.shield_attack_offset_y
+        if self.attack_animation_weapon_id == "grapple":
+            return self.grapple_attack_offset_x, self.grapple_attack_offset_y
+        return self.light_attack_offset_x, self.light_attack_offset_y
+
+    def draw_custom_weapon_frame(self, screen, frame, offset_x=0, offset_y=0, camera=None):
+        if self.facing == -1:
+            frame = pygame.transform.flip(frame, True, False)
+
+        frame_rect = frame.get_rect()
+        frame_rect.midbottom = self.rect.midbottom
+        frame_rect.x += offset_x
+        frame_rect.y += offset_y
+
+        if camera:
+            frame_rect = camera.apply_rect(frame_rect)
+
+        screen.blit(frame, frame_rect)
+
+    def draw_custom_weapon_movement_animation(self, screen, camera=None):
+        visual_state = self.get_visual_state()
+        return self.draw_weapon_specific_state_animation(visual_state, screen, camera)
+
+    def draw_weapon_specific_state_animation(self, visual_state, screen, camera=None):
+        weapon_key = self.normalize_weapon_id(self.current_weapon_id)
+        if weapon_key not in ("light", "heavy", "shooter", "shield", "grapple"):
+            return False
+
+        frames, frame_index, selected_name = self.get_custom_weapon_frames_for_state(weapon_key, visual_state)
+        if DEBUG_JUMP_ANIMATION and visual_state == "jump" and weapon_key in ("shooter", "shield"):
+            print("[JUMP ANIM]")
+            print("current_weapon_id:", self.current_weapon_id)
+            print("weapon_key:", weapon_key)
+            print("selected jump frames:", selected_name)
+            print("frame count:", len(frames) if frames else 0)
+
+        if frames:
+            frame = frames[min(frame_index, len(frames) - 1)]
+            offset_x, offset_y = self.get_custom_weapon_movement_offset(weapon_key)
+            if DEBUG_JUMP_ANIMATION and visual_state == "jump" and weapon_key in ("shooter", "shield"):
+                print("[JUMP DRAW]")
+                print("current weapon id:", self.current_weapon_id)
+                print("normalized weapon key:", weapon_key)
+                print("current movement state:", visual_state)
+                print("frame size:", frame.get_size())
+            self.draw_custom_weapon_frame(
+                screen,
+                frame,
+                offset_x,
+                offset_y,
+                camera,
+            )
+            return True
+
+        return False
+
+    def get_custom_weapon_movement_offset(self, weapon_key):
+        if weapon_key == "light":
+            return self.light_anim_offset_x, self.light_anim_offset_y
+        if weapon_key == "heavy":
+            return self.heavy_anim_offset_x, self.heavy_anim_offset_y
+        if weapon_key == "shooter":
+            return self.shooter_anim_offset_x, self.shooter_anim_offset_y
+        if weapon_key == "shield":
+            return self.shield_anim_offset_x, self.shield_anim_offset_y
+        if weapon_key == "grapple":
+            return self.grapple_anim_offset_x, self.grapple_anim_offset_y
+        return 0, 0
+
+    def get_custom_weapon_frame(self, weapon_prefix, visual_state):
+        frames, index, _ = self.get_custom_weapon_frames_for_state(weapon_prefix, visual_state)
+        if frames:
+            return frames[min(index, len(frames) - 1)]
+
+        return None
+
+    def get_custom_weapon_frames_for_state(self, weapon_prefix, visual_state):
+        frame_map = {
+            "light": {
+                "dash": (self.light_weapon_dash_frames, self.light_dash_index, "light jump" if visual_state == "jump" else "light dash"),
+                "jump": (self.light_weapon_jump_frames, self.light_jump_index, "light jump"),
+                "walk": (self.light_weapon_walk_frames, self.light_walk_index, "light walk"),
+                "idle": (self.light_weapon_idle_frames, self.light_idle_index, "light idle"),
+            },
+            "heavy": {
+                "dash": (self.heavy_weapon_dash_frames, self.heavy_dash_index, "heavy dash"),
+                "jump": (self.heavy_weapon_jump_frames, self.heavy_jump_index, "heavy jump"),
+                "walk": (self.heavy_weapon_walk_frames, self.heavy_walk_index, "heavy walk"),
+                "idle": (self.heavy_weapon_idle_frames, self.heavy_idle_index, "heavy idle"),
+            },
+            "shooter": {
+                "dash": (self.shooter_weapon_dash_frames, self.shooter_dash_index, "shooter dash"),
+                "jump": (self.shooter_weapon_jump_frames, self.shooter_jump_index, "shooter jump"),
+                "walk": (self.shooter_weapon_walk_frames, self.shooter_walk_index, "shooter walk"),
+                "idle": (self.shooter_weapon_idle_frames, self.shooter_idle_index, "shooter idle"),
+            },
+            "shield": {
+                "dash": (self.shield_weapon_dash_frames, self.shield_dash_index, "shield dash"),
+                "jump": (self.shield_weapon_jump_frames, self.shield_jump_index, "shield jump"),
+                "walk": (self.shield_weapon_walk_frames, self.shield_walk_index, "shield walk"),
+                "idle": (self.shield_weapon_idle_frames, self.shield_idle_index, "shield idle"),
+            },
+            "grapple": {
+                "dash": (self.grapple_weapon_dash_frames, self.grapple_dash_index, "grapple dash"),
+                "jump": (self.grapple_weapon_jump_frames, self.grapple_jump_index, "grapple jump"),
+                "walk": (self.grapple_weapon_walk_frames, self.grapple_walk_index, "grapple walk"),
+                "idle": (self.grapple_weapon_idle_frames, self.grapple_idle_index, "grapple idle"),
+            },
+        }
+        return frame_map[weapon_prefix].get(visual_state, ([], 0, f"{weapon_prefix} {visual_state} missing"))
+
+    def draw_light_weapon(self, screen, camera=None):
+        if self.current_weapon_id != "light_weapon":
+            return
+
+        world_x = self.rect.centerx + 10 if self.facing == 1 else self.rect.centerx - 40
+        world_y = self.rect.centery - 5
+        draw_pos = (world_x, world_y)
+        if camera:
+            draw_pos = camera.apply_pos(draw_pos)
+
+        if self.light_weapon_image is None:
+            self.draw_light_weapon_fallback(screen, draw_pos)
+            return
+
+        weapon_image = self.light_weapon_image
+        if self.facing == -1:
+            weapon_image = pygame.transform.flip(weapon_image, True, False)
+
+        angle = 0
+        if self.is_attacking and self.attack_timer > 0 and self.attack_visual_duration > 0:
+            progress = 1 - (self.attack_timer / self.attack_visual_duration)
+            progress = max(0, min(1, progress))
+            if self.facing == 1:
+                angle = -35 + (70 * progress)
+            else:
+                angle = 35 - (70 * progress)
+
+        base_rect = weapon_image.get_rect(topleft=draw_pos)
+        weapon_image = pygame.transform.rotate(weapon_image, angle)
+        weapon_rect = weapon_image.get_rect(center=base_rect.center)
+        screen.blit(weapon_image, weapon_rect)
+
+    def draw_light_weapon_fallback(self, screen, draw_pos):
+        x, y = draw_pos
+        moon_core = (150, 220, 255)
+        moon_glow = (90, 170, 230)
+        blade_rect = pygame.Rect(x, y + 2, 30, 5)
+
+        if self.facing == -1:
+            blade_rect.right = x + 30
+
+        if self.is_attacking and self.attack_timer > 0 and self.attack_visual_duration > 0:
+            progress = 1 - (self.attack_timer / self.attack_visual_duration)
+            progress = max(0, min(1, progress))
+            swing_offset = int(10 * progress)
+            blade_rect.y += swing_offset if self.facing == 1 else -swing_offset
+
+        pygame.draw.rect(screen, moon_core, blade_rect)
+        pygame.draw.rect(screen, moon_glow, blade_rect, 2)
 
     def draw_kael_template(self, screen, draw_rect, state_color):
         """
@@ -969,10 +1745,7 @@ class Player:
         shadow = (12, 14, 22)
 
         # Special state colors
-        if self.guard_broken_timer > 0:
-            moon_core = (255, 180, 80)
-            moon_glow = (255, 120, 50)
-        elif self.invincible_timer > 0:
+        if self.invincible_timer > 0:
             moon_core = (255, 255, 255)
             moon_glow = (220, 240, 255)
         elif self.is_dashing:
@@ -1032,7 +1805,9 @@ class Player:
         pygame.draw.rect(screen, armor_light, (right_leg.x, right_leg.bottom - 4, 10, 4))
 
         # Weapon hint / small blade glow when attacking
-        if self.is_attacking:
+        if self.is_attacking and not (
+            self.current_weapon_id == "light_weapon" and self.light_weapon_image is not None
+        ):
             if self.facing == 1:
                 blade_rect = pygame.Rect(x + w - 2, y + 28, 28, 5)
             else:
@@ -1070,6 +1845,9 @@ class Player:
         """Load an animation"""
         json_path = PROJECT_ROOT / json_path
         png_path = PROJECT_ROOT / png_path
+        if not json_path.exists() or not png_path.exists():
+            return None
+
         anim = load_libresprite_animation(json_path, png_path, scale)
         if anim:
             self.animations[animation_name] = anim

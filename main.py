@@ -1,10 +1,13 @@
+import json
 import math
+from pathlib import Path
 
 import pygame
 
 from settings import (
     COIN_PICKUP_RANGE,
     COIN_VALUE,
+    DEBUG_DRAW_HITBOXES,
     DEBUG_MODE,
     ENEMY_DAMAGE,
     FPS,
@@ -15,13 +18,15 @@ from settings import (
     ENERGY_BEAM_DAMAGE,
     ENERGY_BEAM_HEIGHT,
     ENERGY_BEAM_RANGE,
-    EXECUTE_HP_THRESHOLD,
     EXECUTE_PARRY_WINDOW,
-    EXECUTE_RANGE,
     NORMAL_PARRY_STUN_TIME,
     ORBIT_BLADE_COUNT,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
+    SHOOTER_BULLET_MAX_DISTANCE,
+    SHOOTER_BULLET_MUZZLE_OFFSET_X,
+    SHOOTER_BULLET_MUZZLE_OFFSET_Y,
+    SHOOTER_BULLET_SPEED,
     SOUL_ANCHOR_DURATION,
     SOUL_ANCHOR_RETURN_COST,
     TIME_FREEZE_DURATION,
@@ -32,6 +37,8 @@ from settings import (
     PIXEL_HEIGHT
 )
 from src.core.camera import Camera
+from src.entities.archer import ArcherEnemy
+from src.entities.boss import PaleCoreBoss
 from src.entities.enemy import Enemy
 from src.entities.moon_shard import MoonShard
 from src.entities.player import Player
@@ -39,19 +46,54 @@ from src.levels.level_manager import LevelManager
 from src.systems.coin import Coin
 from src.systems.combat import calculate_damage
 from src.systems.dev_teleport import DevTeleport
-from src.systems.projectile import Projectile, ReturningShield
+from src.systems.projectile import (
+    Projectile,
+    ProjectileHitEffect,
+    ReturningShield,
+    print_projectile_asset_debug_summary,
+)
 from src.systems.shop import Shop
 from src.systems.skills import (
     EnergyBeamEffect,
     OrbitBlade,
-    SkillCircleEffect,
+    SkillSpriteEffect,
+    SoulAnchorLoop,
     TimeFreezeDomain,
     get_skill,
+    get_skill_frames,
+    print_skill_asset_debug_summary,
 )
 from src.systems.weapons import get_weapon
 from src.ui.main_menu import MainMenu
 from src.ui.pause_menu import PauseMenu
 from src.ui.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+ENEMY_SPAWN_PATH = PROJECT_ROOT / "assets" / "maps" / "enemy_spawns.json"
+DEBUG_FORCE_TEST_ENEMY = False
+DEBUG_ENEMY_AI = False
+ARCHER_SPAWNS = [
+    {"x": 863, "y": 260, "mode": "static", "patrol_left": 0, "patrol_right": 0},
+    {"x": 1802, "y": 200, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+    {"x": 2567, "y": 270, "mode": "patrol", "patrol_left": 80, "patrol_right": 40},
+    {"x": 2794, "y": 420, "mode": "static", "patrol_left": 0, "patrol_right": 0},
+    {"x": 6308, "y": 200, "mode": "patrol", "patrol_left": 100, "patrol_right": 100},
+    {"x": 7289, "y": 150, "mode": "patrol", "patrol_left": 80, "patrol_right": 40},
+    {"x": 9162, "y": 180, "mode": "static", "patrol_left": 0, "patrol_right": 0},
+    {"x": 10747, "y": 290, "mode": "static", "patrol_left": 0, "patrol_right": 0},
+]
+MELEE_SPAWNS = [
+    {"x": 632, "y": 400, "mode": "static", "patrol_left": 0, "patrol_right": 0},
+    {"x": 1569, "y": 600, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+    {"x": 2937, "y": 650, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+    {"x": 3674, "y": 650, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+    {"x": 3674, "y": 240, "mode": "patrol", "patrol_left": 70, "patrol_right": 70},
+    {"x": 4553, "y": 560, "mode": "static", "patrol_left": 0, "patrol_right": 0},
+    {"x": 6000, "y": 650, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+    {"x": 7233, "y": 650, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+    {"x": 8187, "y": 380, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
+]
 
 
 def main():
@@ -61,11 +103,13 @@ def main():
     screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)).convert()
     pygame.display.set_caption(TITLE)
     clock = pygame.time.Clock()
+    print_skill_asset_debug_summary()
+    print_projectile_asset_debug_summary()
 
     level_manager = LevelManager()
     player = Player(100, 500)
-    player.load_all_animations() 
     enemy = Enemy(0, 0)
+    pale_core_boss = PaleCoreBoss()
     moon_shard = MoonShard()
     current_map = level_manager.get_current_map()
     camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, current_map.width, current_map.height)
@@ -85,15 +129,22 @@ def main():
 
     coins = []
     projectiles = []
+    projectile_hit_effects = []
+    enemies = []
+    archers = []
+    archer_arrows = []
     returning_shields = []
     time_freeze_domains = []
     active_orbit_blades = []
     active_skill_effects = []
+    soul_anchor_loops = []
 
     u_was_pressed = False
     grapple_special_hitbox = None
     grapple_special_timer = 0
+    enemy_debug_frame = 0
     game_state = "menu"
+    show_player_debug_overlay = False
 
     
     dev_teleport = DevTeleport()
@@ -126,31 +177,206 @@ def main():
         camera.snap_to(player.rect)
         moon_shard.reset_to(player.rect, player.facing)
 
-    def clear_world_objects():
+    def debug_remove_enemy(reason, removed_enemy):
+        hp = getattr(removed_enemy, "current_hp", getattr(removed_enemy, "hp", None))
+        print("[ENEMY REMOVED]", reason, removed_enemy.rect, hp)
+
+    def sync_primary_enemy():
+        if enemies:
+            return enemies[0]
+        enemy.disable()
+        return enemy
+
+    def print_room_clear_debug():
+        room_cleared = len(enemies) == 0
+        boss_stage_active = pale_core_boss.active
+        normal_enemy_spawn_enabled = level_manager.get_current_map().map_type != "boss_stage"
+        print("room_cleared:", room_cleared)
+        print("boss_stage_active:", boss_stage_active)
+        print("normal_enemy_spawn_enabled:", normal_enemy_spawn_enabled)
+
+    def create_normal_enemy(
+        enemy_type,
+        x,
+        y,
+        mode="patrol",
+        patrol_left=80,
+        patrol_right=80,
+        index=None,
+    ):
+        normal_enemy = Enemy(
+            x,
+            y,
+            mode=mode,
+            patrol_left=patrol_left,
+            patrol_right=patrol_right,
+            index=index,
+            debug_ai=DEBUG_ENEMY_AI,
+        )
+        enemies.append(normal_enemy)
+        print("[ENEMY CREATED]")
+        print("Enemy type:", enemy_type)
+        print("World position:", x, y)
+        print("Enemy rect:", normal_enemy.rect)
+        print("Total enemies now:", len(enemies))
+        return normal_enemy
+
+    def spawn_level_enemies():
+        enemies.clear()
+        current_level = level_manager.get_current_map()
+        level_name = current_level.name
+        map_name = f"map{current_level.map_id}"
+        enemy_spawns = list(current_level.enemy_spawns or [])
+        if current_level.map_id in (0, 1):
+            enemy_spawns = []
+
+        print("[LEVEL ENEMY DEBUG]")
+        print("Current level name:", level_name)
+        print("Current map:", map_name)
+        print("Enemy spawn data found:", enemy_spawns)
+        print("Enemy spawn count:", len(enemy_spawns))
+        print_room_clear_debug()
+
+        for spawn in enemy_spawns:
+            enemy_type = "normal"
+            if isinstance(spawn, dict):
+                enemy_type = spawn.get("type", "normal")
+                x = spawn.get("x", player.rect.centerx + 300)
+                y = spawn.get("y", player.rect.y)
+            else:
+                x, y = spawn
+            create_normal_enemy(enemy_type, int(x), int(y))
+
+        if DEBUG_FORCE_TEST_ENEMY and len(enemies) == 0:
+            test_x = player.rect.centerx + 300
+            test_y = player.rect.y
+            print("[TEMP DEBUG ENEMY SPAWN] No map spawn data; spawning one normal enemy near player.")
+            create_normal_enemy("temporary_debug_normal", test_x, test_y)
+
+        sync_primary_enemy()
+        print("[LEVEL SETUP COMPLETE]")
+        print("Final enemy count:", len(enemies))
+
+    def clear_world_objects(reason="map transition reset"):
         nonlocal u_was_pressed, grapple_special_hitbox, grapple_special_timer
         coins.clear()
         projectiles.clear()
+        projectile_hit_effects.clear()
+        for normal_enemy in enemies:
+            debug_remove_enemy(reason, normal_enemy)
+        enemies.clear()
+        for archer in archers:
+            debug_remove_enemy(reason, archer)
+        archers.clear()
+        archer_arrows.clear()
         returning_shields.clear()
         time_freeze_domains.clear()
         active_orbit_blades.clear()
         active_skill_effects.clear()
+        soul_anchor_loops.clear()
         player.has_active_shield_throw = False
         grapple_special_hitbox = None
         grapple_special_timer = 0
         u_was_pressed = False
+
+    def spawn_map_archers():
+        archers.clear()
+        spawn_points = []
+
+        if not ENEMY_SPAWN_PATH.exists():
+            print("Missing enemy spawn file:", ENEMY_SPAWN_PATH)
+        else:
+            try:
+                spawn_data = json.loads(ENEMY_SPAWN_PATH.read_text())
+            except json.JSONDecodeError as error:
+                print("Invalid enemy spawn file:", ENEMY_SPAWN_PATH)
+                print(error)
+                spawn_data = {}
+
+            current_map_key = f"map{level_manager.get_current_map().map_id}"
+            for spawn in spawn_data.get(current_map_key, []):
+                if spawn.get("type") != "archer":
+                    continue
+                spawn_points.append(
+                    {
+                        "x": spawn.get("x", 0),
+                        "y": spawn.get("y", 0),
+                        "mode": spawn.get("mode", "patrol"),
+                        "patrol_left": spawn.get("patrol_left", 120),
+                        "patrol_right": spawn.get("patrol_right", 120),
+                    }
+                )
+
+        current_map = level_manager.get_current_map()
+        if current_map.map_id in (0, 1):
+            spawn_points = list(ARCHER_SPAWNS)
+
+        print("[ARCHER SPAWN SETUP]")
+        print("Archer spawn count:", len(spawn_points))
+
+        for index, spawn in enumerate(spawn_points, start=1):
+            x = spawn["x"]
+            y = spawn["y"]
+            mode = spawn.get("mode", "patrol")
+            patrol_left = spawn.get("patrol_left", 120)
+            patrol_right = spawn.get("patrol_right", 120)
+            archer = ArcherEnemy(
+                x,
+                y,
+                mode=mode,
+                patrol_left=patrol_left,
+                patrol_right=patrol_right,
+                index=index,
+                debug_ai=DEBUG_ENEMY_AI,
+            )
+            archers.append(archer)
+            print("[ARCHER CREATED]", index, x, y, archer.rect)
+            print("[ARCHER CONFIG]", index, mode, x, y, archer.patrol_min_x, archer.patrol_max_x)
+
+        print("Total normal enemies:", len(archers))
+
+    def spawn_map_melees():
+        current_map = level_manager.get_current_map()
+        if current_map.map_id not in (0, 1):
+            return
+
+        print("[MELEE SPAWN SETUP]")
+        print("Melee spawn count:", len(MELEE_SPAWNS))
+
+        for index, spawn in enumerate(MELEE_SPAWNS, start=1):
+            x = spawn["x"]
+            y = spawn["y"]
+            mode = spawn.get("mode", "patrol")
+            melee = create_normal_enemy(
+                "melee",
+                x,
+                y,
+                mode=mode,
+                patrol_left=spawn.get("patrol_left", 80),
+                patrol_right=spawn.get("patrol_right", 80),
+                index=index,
+            )
+            print("[MELEE CREATED]", index, x, y, mode, melee.rect)
+
+        print("Total enemies after melee spawn:", len(enemies))
+        print("Total all enemies after melee spawn:", len(enemies) + len(archers))
 
     def enter_map(target_map_id):
         changed = level_manager.change_map(target_map_id, player, enemy, camera)
         if not changed:
             return False
 
-        clear_world_objects()
+        clear_world_objects("map transition reset")
+        spawn_level_enemies()
+        spawn_map_archers()
+        spawn_map_melees()
         shop.close()
         shop_rect = level_manager.get_shop_rect()
         if shop_rect is not None:
             shop.set_rect(shop_rect)
             shop.refresh_products()
         moon_shard.reset_to(player.rect, player.facing)
+        pale_core_boss.active = False
         return True
 
     def restart_game():
@@ -159,8 +385,8 @@ def main():
         player.hp = player.current_hp
         player.current_mana = player.max_mana
         player.mana = player.current_mana
-        player.current_stamina = player.max_stamina
         level_manager.reset_one_use_items()
+        pale_core_boss.reset()
         player.is_dead = False
         player.invincible_timer = 0
         player.vel_x = 0
@@ -213,9 +439,8 @@ def main():
                     e_released = True
             elif event.type == pygame.KEYDOWN:
 
-                                # ----- Dev teleport (F3) takes priority over everything else -----
                 if event.key == pygame.K_F3:
-                    dev_teleport.toggle()
+                    show_player_debug_overlay = not show_player_debug_overlay
                     continue
 
                 if dev_teleport.visible:
@@ -275,8 +500,8 @@ def main():
                 continue
 
             if main_menu.should_start_game:
-                game_state = "playing"
                 main_menu.should_start_game = False
+                restart_game()
 
             main_menu.update(dt)
             main_menu.draw(screen)
@@ -320,16 +545,28 @@ def main():
         fulcrums = level_manager.get_fulcrums()
 
         if game_state == "playing" and not shop.is_open:
+            enemy_debug_frame += 1
+            if enemy_debug_frame % 120 == 0:
+                print("[ENEMY RUNTIME COUNT]", len(enemies) + len(archers))
+                print("[ENEMY UPDATE COUNT]", len(enemies) + len(archers))
+            current_map = level_manager.get_current_map()
+            pale_core_boss.update_activation(current_map.map_id, player)
+
             if grapple_special_timer > 0:
                 grapple_special_timer -= dt
             else:
                 grapple_special_hitbox = None
 
             for domain in time_freeze_domains:
-                domain.update(dt, enemy)
+                for normal_enemy in enemies:
+                    domain.update(dt, normal_enemy)
             time_freeze_domains = [domain for domain in time_freeze_domains if domain.alive]
 
-            enemy.update(dt, player)
+            for normal_enemy in enemies:
+                normal_enemy.update(dt, player, platforms)
+            for archer in archers:
+                archer.update(dt, player, archer_arrows, platforms)
+            pale_core_boss.update(dt, player)
 
         if game_state == "playing" and not player.is_dead and not shop.is_open:
             player.handle_input(keys)
@@ -367,10 +604,13 @@ def main():
             if k_pressed and not map_changed:
                 activate_current_skill(
                     player,
-                    enemy,
+                    enemies,
+                    archers,
+                    pale_core_boss,
                     time_freeze_domains,
                     active_orbit_blades,
                     active_skill_effects,
+                    soul_anchor_loops,
                 )
 
             nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
@@ -389,11 +629,14 @@ def main():
                 player.should_spawn_projectile = False
 
             if not map_changed:
-                handle_player_attack(player, enemy)
+                handle_player_attack_enemies(player, enemies)
+                handle_player_attack_archers(player, archers)
+                handle_player_attack_boss(player, pale_core_boss)
                 new_special_hitbox = handle_weapon_special(
                     keys,
                     player,
-                    enemy,
+                    enemies,
+                    archers,
                     returning_shields,
                     u_was_pressed,
                 )
@@ -407,17 +650,35 @@ def main():
             if not map_changed:
                 u_was_pressed = keys[pygame.K_u]
 
-            update_projectiles(projectiles, dt, platforms, enemy)
-            update_returning_shields(returning_shields, dt, enemy)
-            update_orbit_blades(active_orbit_blades, dt, player, enemy)
+            update_projectiles(projectiles, dt, platforms, enemies, projectile_hit_effects)
+            update_projectile_archer_hits(projectiles, archers, projectile_hit_effects)
+            update_projectile_boss_hits(projectiles, pale_core_boss, projectile_hit_effects)
+            update_returning_shields(returning_shields, dt, enemies)
+            update_returning_shield_archer_hits(returning_shields, archers)
+            update_returning_shield_boss_hits(returning_shields, pale_core_boss)
+            update_archer_arrows(archer_arrows, dt, player)
+            update_orbit_blades(active_orbit_blades, dt, player, enemies, active_skill_effects)
+            update_orbit_blade_boss_hits(active_orbit_blades, pale_core_boss)
+            for archer in archers:
+                if not archer.alive:
+                    debug_remove_enemy("dead", archer)
+            archers = [archer for archer in archers if archer.alive]
             returning_shields = [shield for shield in returning_shields if shield.alive]
             active_orbit_blades = [blade for blade in active_orbit_blades if blade.alive]
             player.has_active_shield_throw = len(returning_shields) > 0
-            handle_enemy_attack(player, enemy)
-            handle_enemy_coin_drop(enemy, coins)
+            for normal_enemy in enemies:
+                handle_enemy_attack(player, normal_enemy)
+                handle_enemy_coin_drop(normal_enemy, coins)
             update_coins(coins, dt, platforms, player)
             coins = [coin for coin in coins if not coin.collected]
             projectiles = [projectile for projectile in projectiles if projectile.alive]
+            archer_arrows = [arrow for arrow in archer_arrows if arrow.alive]
+            for hit_effect in projectile_hit_effects:
+                hit_effect.update(dt)
+            projectile_hit_effects = [effect for effect in projectile_hit_effects if effect.alive]
+
+            if pale_core_boss.defeated:
+                game_state = "victory"
 
         if player.is_dead and game_state == "playing":
             game_state = "game_over"
@@ -429,6 +690,12 @@ def main():
             for effect in active_skill_effects:
                 effect.update(dt)
             active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
+            for anchor_loop in soul_anchor_loops:
+                anchor_loop.update(dt)
+            soul_anchor_loops = [
+                anchor_loop for anchor_loop in soul_anchor_loops
+                if anchor_loop.alive and player.soul_anchor_active
+            ]
 
         # Trails on the opposite side of the player's facing direction.
         # Held still while paused with the rest of the gameplay scene.
@@ -441,6 +708,11 @@ def main():
 
         #screen.fill((18, 20, 30))# Background is drawn inside level_manager.draw_current_map()
 
+        current_map = level_manager.get_current_map()
+        if pale_core_boss.should_draw_background(current_map.map_id, player):
+            level_manager.background_draw_callback = pale_core_boss.draw_background
+        else:
+            level_manager.background_draw_callback = None
         level_manager.draw_current_map(screen, camera)
 
         current_map = level_manager.get_current_map()
@@ -459,17 +731,50 @@ def main():
                 pygame.draw.circle(screen, (235, 220, 255), anchor_pos, 6)
                 pygame.draw.circle(screen, (205, 160, 255), anchor_pos, 30, 2)
 
+        for domain in time_freeze_domains:
+            domain.draw(screen, camera)
+
+        for anchor_loop in soul_anchor_loops:
+            anchor_loop.draw(screen, camera)
+
         for coin in coins:
             coin.draw(screen, camera)
+
+        pale_core_boss.draw_effects(screen, camera)
+        if enemy_debug_frame > 0 and enemy_debug_frame % 120 == 0:
+            for normal_enemy in enemies:
+                screen_x = normal_enemy.rect.x - camera.x
+                screen_y = normal_enemy.rect.y - camera.y
+                print("[ENEMY DRAW POS]", normal_enemy.rect, "screen:", screen_x, screen_y)
+                print("Player world position:", player.rect.center)
+                print("Camera offset:", camera.x, camera.y)
+                print("Enemy world position:", normal_enemy.rect.center)
+            for archer in archers:
+                screen_x = archer.rect.x - camera.x
+                screen_y = archer.rect.y - camera.y
+                print("[ENEMY DRAW POS]", archer.rect, "screen:", screen_x, screen_y)
+                print("Player world position:", player.rect.center)
+                print("Camera offset:", camera.x, camera.y)
+                print("Enemy world position:", archer.rect.center)
+        for normal_enemy in enemies:
+            normal_enemy.draw(screen, camera)
+        for archer in archers:
+            archer.draw(screen, camera)
+        player.draw(screen, camera)
+        # Moon shard renders on top so its glow doesn't get hidden behind the player.
+        moon_shard.draw(screen, camera)
 
         for projectile in projectiles:
             projectile.draw(screen, camera)
 
+        for arrow in archer_arrows:
+            arrow.draw(screen, camera)
+
+        for hit_effect in projectile_hit_effects:
+            hit_effect.draw(screen, camera)
+
         for shield in returning_shields:
             shield.draw(screen, camera)
-
-        for domain in time_freeze_domains:
-            domain.draw(screen, camera)
 
         for blade in active_orbit_blades:
             blade.draw(screen, camera)
@@ -477,17 +782,22 @@ def main():
         for effect in active_skill_effects:
             effect.draw(screen, camera)
 
-        enemy.draw(screen, camera)
-        player.draw(screen, camera)
-        # Moon shard renders on top so its glow doesn't get hidden behind the player.
-        moon_shard.draw(screen, camera)
-
         weapon = get_weapon(player.current_weapon_id)
-        if player.is_attacking and weapon["weapon_type"] != "projectile":
+        hide_custom_weapon_attack_visuals = (
+            player.current_weapon_id in ("light_weapon", "heavy_weapon") and
+            player.attack_animation_playing
+        )
+        if (
+            player.is_attacking and
+            weapon["weapon_type"] != "projectile" and
+            DEBUG_DRAW_HITBOXES and
+            not hide_custom_weapon_attack_visuals
+        ):
             pygame.draw.rect(screen, (70, 140, 255), camera.apply_rect(player.get_attack_hitbox()), 2)
 
-        if enemy.is_attacking and enemy.alive:
-            pygame.draw.rect(screen, (255, 150, 50), camera.apply_rect(enemy.get_attack_hitbox()), 2)
+        for normal_enemy in enemies:
+            if normal_enemy.is_attacking and normal_enemy.alive:
+                pygame.draw.rect(screen, (255, 150, 50), camera.apply_rect(normal_enemy.get_attack_hitbox()), 2)
 
         if grapple_special_hitbox is not None:
             pygame.draw.rect(screen, (180, 80, 255), camera.apply_rect(grapple_special_hitbox), 2)
@@ -507,6 +817,7 @@ def main():
             draw_door_interaction_text(screen, nearby_door, camera)
 
         draw_player_ui(screen, player, level_manager.get_current_map().name)
+        pale_core_boss.draw_ui(screen)
 
         if DEBUG_MODE:
             draw_weapon_boxes(screen, player)
@@ -518,18 +829,22 @@ def main():
         if game_state == "game_over":
             draw_popup(screen, "GAME OVER", "You were defeated.")
         elif game_state == "victory":
-            draw_popup(screen, "PROTOTYPE COMPLETE", "You reached the final door.")
+            draw_popup(screen, "PALE CORE DEFEATED", "The Lunar Core has gone silent.")
         elif game_state == "paused":
             pause_menu.draw(screen)
         if PIXELATE_GAME:
             small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
             pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
             window.blit(pixel_surface, (0, 0))
+            if DEBUG_MODE or show_player_debug_overlay:
+                draw_player_debug_position(window, player)
             # Draw dev tools after pixel scaling so F3 text stays readable.
             dev_teleport.draw(window)
         else:
             # Dev teleport overlay is drawn last so it sits on top of everything.
             dev_teleport.draw(screen)
+            if DEBUG_MODE or show_player_debug_overlay:
+                draw_player_debug_position(screen, player)
             window.blit(screen, (0, 0))
 
         pygame.display.flip()
@@ -544,54 +859,160 @@ def spawn_projectile(player, projectiles):
         return
 
     damage, is_critical = calculate_damage(player, weapon["damage"])
+    direction = player.facing
+    spawn_x = player.rect.centerx + direction * SHOOTER_BULLET_MUZZLE_OFFSET_X
+    spawn_y = player.rect.centery + SHOOTER_BULLET_MUZZLE_OFFSET_Y
+
+    print("[SHOOTER FIRE]")
+    print("current weapon:", player.current_weapon_id)
+    print("bullet spawn:", spawn_x, spawn_y)
+    print("Player center:", player.rect.center)
+    print("Facing:", direction)
 
     projectile = Projectile(
-        player.rect.centerx,
-        player.rect.centery,
-        player.facing,
+        spawn_x,
+        spawn_y,
+        direction,
         damage,
         is_critical,
-        weapon.get("projectile_speed", 12),
-        weapon.get("projectile_max_distance", 350),
+        SHOOTER_BULLET_SPEED,
+        SHOOTER_BULLET_MAX_DISTANCE,
         "weapon",
     )
+    print("bullet frames:", len(projectile.frames))
     projectiles.append(projectile)
 
 
 def handle_player_attack(player, enemy):
     weapon = get_weapon(player.current_weapon_id)
+    attack_hitbox = None
+    melee_hitbox_types = ("melee", "shield", "grapple")
 
     if player.is_auto_grappling:
         return
 
-    if not player.is_attacking or not enemy.alive:
+    if not player.is_attacking:
         return
 
     if weapon["weapon_type"] == "projectile":
         return
+
+    if weapon["weapon_type"] in melee_hitbox_types:
+        attack_hitbox = player.get_attack_hitbox()
     
-    print(f"Attack hitbox: {attack_hitbox}")
+    if attack_hitbox is not None:
+        print(f"Attack hitbox: {attack_hitbox}")
     print(f"Enemy rect: {enemy.rect}")
-    print(f"Collision: {attack_hitbox.colliderect(enemy.rect)}")
+    if attack_hitbox is not None:
+        print(f"Collision: {attack_hitbox.colliderect(enemy.rect)}")
     print(f"player.attack_has_hit: {player.attack_has_hit}")
 
-    attack_hitbox = player.get_attack_hitbox()
+    if attack_hitbox is not None and enemy.alive:
+        if attack_hitbox.colliderect(enemy.rect) and not player.attack_has_hit:
+            damage, is_critical = calculate_damage(player, weapon["damage"])
+            enemy.take_damage(damage)
+            player.attack_has_hit = True
 
-    if attack_hitbox.colliderect(enemy.rect) and not player.attack_has_hit:
+            if weapon["weapon_type"] == "grapple":
+                enemy.stun(weapon["stun_time"])
+
+            if is_critical:
+                print(f"Hit enemy for {damage} damage CRITICAL")
+            else:
+                print(f"Hit enemy for {damage} damage")
+
+
+def handle_player_attack_enemies(player, enemies):
+    weapon = get_weapon(player.current_weapon_id)
+    melee_hitbox_types = ("melee", "shield", "grapple")
+
+    if player.is_auto_grappling or not player.is_attacking or player.attack_has_hit:
+        return
+
+    if weapon["weapon_type"] not in melee_hitbox_types:
+        return
+
+    attack_hitbox = player.get_attack_hitbox()
+    print(f"Attack hitbox: {attack_hitbox}")
+
+    for normal_enemy in enemies:
+        print(f"Enemy rect: {normal_enemy.rect}")
+        print(f"Collision: {attack_hitbox.colliderect(normal_enemy.rect)}")
+        if not normal_enemy.alive:
+            continue
+        if not attack_hitbox.colliderect(normal_enemy.rect):
+            continue
+
         damage, is_critical = calculate_damage(player, weapon["damage"])
-        enemy.take_damage(damage)
+        normal_enemy.take_damage(damage)
         player.attack_has_hit = True
 
         if weapon["weapon_type"] == "grapple":
-            enemy.stun(weapon["stun_time"])
+            normal_enemy.stun(weapon["stun_time"])
 
         if is_critical:
             print(f"Hit enemy for {damage} damage CRITICAL")
         else:
             print(f"Hit enemy for {damage} damage")
+        return
 
 
-def handle_weapon_special(keys, player, enemy, returning_shields, u_was_pressed):
+def handle_player_attack_archers(player, archers):
+    weapon = get_weapon(player.current_weapon_id)
+    melee_hitbox_types = ("melee", "shield", "grapple")
+
+    if player.is_auto_grappling or not player.is_attacking or player.attack_has_hit:
+        return
+
+    if weapon["weapon_type"] not in melee_hitbox_types:
+        return
+
+    attack_hitbox = player.get_attack_hitbox()
+    for archer in archers:
+        if not archer.alive:
+            continue
+        if not attack_hitbox.colliderect(archer.rect):
+            continue
+
+        damage, is_critical = calculate_damage(player, weapon["damage"])
+        archer.take_damage(damage)
+        player.attack_has_hit = True
+
+        if weapon["weapon_type"] == "grapple":
+            archer.stun(weapon["stun_time"])
+
+        if is_critical:
+            print(f"Hit archer for {damage} damage CRITICAL")
+        else:
+            print(f"Hit archer for {damage} damage")
+        return
+
+
+def handle_player_attack_boss(player, boss):
+    if not boss.active or boss.defeated:
+        return
+
+    if player.is_auto_grappling or not player.is_attacking or player.attack_has_hit:
+        return
+
+    weapon = get_weapon(player.current_weapon_id)
+    if weapon["weapon_type"] not in ("melee", "shield", "grapple"):
+        return
+
+    attack_hitbox = player.get_attack_hitbox()
+    if not attack_hitbox.colliderect(boss.weakpoint_rect):
+        return
+
+    damage, is_critical = calculate_damage(player, weapon["damage"])
+    if boss.take_damage(damage):
+        player.attack_has_hit = True
+        if is_critical:
+            print(f"Hit Pale Core weakpoint for {damage} damage CRITICAL")
+        else:
+            print(f"Hit Pale Core weakpoint for {damage} damage")
+
+
+def handle_weapon_special(keys, player, enemies, archers, returning_shields, u_was_pressed):
     if player.is_auto_grappling:
         return None
 
@@ -611,8 +1032,13 @@ def handle_weapon_special(keys, player, enemy, returning_shields, u_was_pressed)
 
     special_hitbox = get_grapple_special_hitbox(player)
 
-    if enemy.alive and special_hitbox.colliderect(enemy.rect):
-        enemy.start_pull_to_player(player)
+    for normal_enemy in enemies:
+        if normal_enemy.alive and special_hitbox.colliderect(normal_enemy.rect):
+            normal_enemy.start_pull_to_player(player)
+
+    for archer in archers:
+        if archer.alive and special_hitbox.colliderect(archer.rect):
+            archer.start_pull_to_player(player)
 
     player.special_cooldown_timer = WEAPON_SPECIAL_COOLDOWN
     return special_hitbox
@@ -621,10 +1047,6 @@ def handle_weapon_special(keys, player, enemy, returning_shields, u_was_pressed)
 def handle_shield_special(player, returning_shields, weapon):
     if player.is_blocking:
         print("Cannot throw shield while blocking")
-        return None
-
-    if player.guard_broken_timer > 0:
-        print("Cannot throw shield during guard break")
         return None
 
     if player.has_active_shield_throw:
@@ -658,37 +1080,153 @@ def get_grapple_special_hitbox(player):
     return pygame.Rect(hitbox_x, hitbox_y, weapon["width"], weapon["height"])
 
 
-def update_projectiles(projectiles, dt, platforms, enemy):
+def update_projectiles(projectiles, dt, platforms, enemies, projectile_hit_effects):
     for projectile in projectiles:
         projectile.update(dt, platforms)
 
-        if enemy.alive and projectile.alive and projectile.rect.colliderect(enemy.rect):
-            enemy.take_damage(projectile.damage)
+        for normal_enemy in enemies:
+            if normal_enemy.alive and projectile.alive and projectile.rect.colliderect(normal_enemy.rect):
+                normal_enemy.take_damage(projectile.damage)
+                projectile_hit_effects.append(ProjectileHitEffect(projectile.rect.center))
+                projectile.alive = False
+                break
+
+
+def update_projectile_archer_hits(projectiles, archers, projectile_hit_effects):
+    for projectile in projectiles:
+        if not projectile.alive:
+            continue
+
+        for archer in archers:
+            if not archer.alive:
+                continue
+            if projectile.rect.colliderect(archer.rect):
+                archer.take_damage(projectile.damage)
+                projectile_hit_effects.append(ProjectileHitEffect(projectile.rect.center))
+                projectile.alive = False
+                print(f"Projectile hit archer for {projectile.damage} damage")
+                break
+
+
+def update_projectile_boss_hits(projectiles, boss, projectile_hit_effects):
+    if not boss.active or boss.defeated:
+        return
+
+    for projectile in projectiles:
+        if not projectile.alive:
+            continue
+        if projectile.rect.colliderect(boss.weakpoint_rect) and boss.take_damage(projectile.damage):
+            projectile_hit_effects.append(ProjectileHitEffect(projectile.rect.center))
             projectile.alive = False
+            print(f"Projectile hit Pale Core weakpoint for {projectile.damage} damage")
 
 
-def update_returning_shields(returning_shields, dt, enemy):
+def update_returning_shields(returning_shields, dt, enemies):
     for shield in returning_shields:
         shield.update(dt)
-        shield.check_enemy_collision(enemy)
+        for normal_enemy in enemies:
+            shield.check_enemy_collision(normal_enemy)
 
 
-def update_orbit_blades(active_orbit_blades, dt, player, enemy):
+def update_returning_shield_archer_hits(returning_shields, archers):
+    for shield in returning_shields:
+        for archer in archers:
+            shield.check_enemy_collision(archer)
+
+
+def update_returning_shield_boss_hits(returning_shields, boss):
+    if not boss.active or boss.defeated:
+        return
+
+    for shield in returning_shields:
+        if not shield.alive or shield.hit_cooldown_timer > 0:
+            continue
+        if not shield.rect.colliderect(boss.weakpoint_rect):
+            continue
+
+        if not shield.returning:
+            if getattr(shield, "hit_boss_outgoing", False):
+                continue
+            if boss.take_damage(shield.damage):
+                shield.hit_boss_outgoing = True
+                shield.hit_cooldown_timer = 0.18
+                print(f"Shield outgoing hit Pale Core weakpoint for {shield.damage} damage")
+            continue
+
+        if getattr(shield, "hit_boss_returning", False):
+            continue
+        if boss.take_damage(shield.damage):
+            shield.hit_boss_returning = True
+            shield.hit_cooldown_timer = 0.18
+            print(f"Shield returning hit Pale Core weakpoint for {shield.damage} damage")
+
+
+def update_orbit_blades(active_orbit_blades, dt, player, enemies, active_skill_effects):
     for blade in active_orbit_blades:
-        blade.update(dt, player, enemy)
+        target_enemy = get_nearest_alive_enemy(blade.rect.center, enemies)
+        if target_enemy is not None:
+            blade.update(dt, player, target_enemy)
+        else:
+            blade.update(dt, player, Enemy(-99999, -99999))
+        if getattr(blade, "hit_effect", None) is not None:
+            active_skill_effects.append(blade.hit_effect)
+            blade.hit_effect = None
+
+
+def update_orbit_blade_boss_hits(active_orbit_blades, boss):
+    if not boss.active or boss.defeated:
+        return
+
+    for blade in active_orbit_blades:
+        if not blade.alive or getattr(blade, "has_hit", False):
+            continue
+        if blade.rect.colliderect(boss.weakpoint_rect) and boss.take_damage(blade.damage):
+            blade.has_hit = True
+            blade.alive = False
+            blade.state = "dead"
+            print(f"Orbit blade hit Pale Core weakpoint for {blade.damage} damage")
+
+
+def update_archer_arrows(archer_arrows, dt, player):
+    for arrow in archer_arrows:
+        arrow.update(dt, player)
+
+
+def get_nearest_alive_enemy(origin, enemies):
+    nearest_enemy = None
+    nearest_distance = None
+    for normal_enemy in enemies:
+        if not normal_enemy.alive:
+            continue
+        distance = math.hypot(
+            normal_enemy.rect.centerx - origin[0],
+            normal_enemy.rect.centery - origin[1],
+        )
+        if nearest_distance is None or distance < nearest_distance:
+            nearest_distance = distance
+            nearest_enemy = normal_enemy
+    return nearest_enemy
 
 
 def activate_current_skill(
     player,
-    enemy,
+    enemies,
+    archers,
+    boss,
     time_freeze_domains,
     active_orbit_blades,
     active_skill_effects,
+    soul_anchor_loops,
 ):
     skill = get_skill(player.current_skill_id)
+    print("[SKILL USE]")
+    print("current_skill_id:", player.current_skill_id)
+    print("mana:", player.current_mana)
+    print("cooldown:", player.skill_cooldown_timer)
+    print("skill frames loaded:", get_skill_loaded_frame_count(skill["skill_type"]))
 
     if skill["skill_type"] == "soul_anchor" and player.soul_anchor_active:
-        activate_soul_anchor(player, skill, active_skill_effects)
+        activate_soul_anchor(player, skill, active_skill_effects, soul_anchor_loops)
         return
 
     if not player.can_use_skill(skill):
@@ -698,79 +1236,78 @@ def activate_current_skill(
     if skill["skill_type"] == "time_freeze":
         player.spend_skill_cost(skill)
         time_freeze_domains.append(TimeFreezeDomain(player.rect.center, TIME_FREEZE_DURATION))
+        print("Time Freeze freeze center:", player.rect.center)
         print("Time Freeze")
 
     elif skill["skill_type"] == "orbit_blades":
         player.spend_skill_cost(skill)
         for index in range(ORBIT_BLADE_COUNT):
             active_orbit_blades.append(OrbitBlade(player, index, ORBIT_BLADE_COUNT))
+        print("Orbit Blades blade count:", ORBIT_BLADE_COUNT)
         print("Orbit Blades")
 
     elif skill["skill_type"] == "energy_beam":
         player.spend_skill_cost(skill)
         beam_rect = get_energy_beam_rect(player)
-        if enemy.alive and beam_rect.colliderect(enemy.rect):
-            enemy.take_damage(ENERGY_BEAM_DAMAGE)
-            print("Energy Beam hit enemy")
-        active_skill_effects.append(EnergyBeamEffect(beam_rect))
-
-    elif skill["skill_type"] == "execute":
-        activate_execute_strike(player, enemy, skill, active_skill_effects)
+        enemies_hit = 0
+        for normal_enemy in enemies:
+            if normal_enemy.alive and beam_rect.colliderect(normal_enemy.rect):
+                normal_enemy.take_damage(ENERGY_BEAM_DAMAGE)
+                active_skill_effects.append(
+                    SkillSpriteEffect("energy_beam_hit", normal_enemy.rect.center, duration=0.35)
+                )
+                enemies_hit += 1
+                print("Energy Beam hit enemy")
+        for archer in archers:
+            if archer.alive and beam_rect.colliderect(archer.rect):
+                archer.take_damage(ENERGY_BEAM_DAMAGE)
+                active_skill_effects.append(
+                    SkillSpriteEffect("energy_beam_hit", archer.rect.center, duration=0.35)
+                )
+                enemies_hit += 1
+                print("Energy Beam hit archer")
+        if boss.active and not boss.defeated and beam_rect.colliderect(boss.weakpoint_rect):
+            if boss.take_damage(ENERGY_BEAM_DAMAGE):
+                active_skill_effects.append(
+                    SkillSpriteEffect("energy_beam_hit", boss.weakpoint_rect.center, duration=0.35)
+                )
+                enemies_hit += 1
+                print("Energy Beam hit Pale Core weakpoint")
+        if enemies_hit == 0:
+            hit_x = beam_rect.right if player.facing == 1 else beam_rect.left
+            active_skill_effects.append(
+                SkillSpriteEffect("energy_beam_hit", (hit_x, beam_rect.centery), duration=0.25)
+            )
+        active_skill_effects.append(EnergyBeamEffect(beam_rect, player.facing))
+        print("Energy Beam beam rect:", beam_rect)
+        print("Energy Beam enemies hit count:", enemies_hit)
 
     elif skill["skill_type"] == "soul_anchor":
-        activate_soul_anchor(player, skill, active_skill_effects)
+        activate_soul_anchor(player, skill, active_skill_effects, soul_anchor_loops)
+
+
+def get_skill_loaded_frame_count(skill_type):
+    asset_keys = {
+        "time_freeze": ["time_freeze_ready", "time_freeze_action", "time_freeze_loop"],
+        "orbit_blades": ["orbit_blades_ready", "orbit_blade_projectile", "orbit_blade_hit"],
+        "energy_beam": ["energy_beam_ready", "energy_beam_attack", "energy_beam_hit"],
+        "soul_anchor": ["soul_anchor_ready", "soul_anchor_place", "soul_anchor_loop", "soul_anchor_return"],
+    }
+    return {asset_key: len(get_skill_frames(asset_key)) for asset_key in asset_keys.get(skill_type, [])}
 
 
 def get_energy_beam_rect(player):
     y = player.rect.centery - ENERGY_BEAM_HEIGHT // 2
 
     if player.facing == 1:
-        x = player.rect.right
+        x = player.rect.centerx
     else:
-        x = player.rect.left - ENERGY_BEAM_RANGE
+        x = player.rect.centerx - ENERGY_BEAM_RANGE
 
     return pygame.Rect(x, y, ENERGY_BEAM_RANGE, ENERGY_BEAM_HEIGHT)
 
 
-def activate_execute_strike(player, enemy, skill, active_skill_effects):
-    target = get_enemy_in_front(player, enemy, EXECUTE_RANGE)
-
-    if target is None:
-        print("Enemy is not executable")
-        return
-
-    hp_is_low = target.current_hp <= target.max_hp * EXECUTE_HP_THRESHOLD
-    if not hp_is_low and not target.is_executable:
-        print("Enemy is not executable")
-        return
-
-    player.spend_skill_cost(skill)
-    target.execute()
-    active_skill_effects.append(SkillCircleEffect(target.rect.center, 42, (255, 80, 40)))
-    print("Executed enemy")
-
-
-def get_enemy_in_front(player, enemy, skill_range):
-    if not enemy.alive:
-        return None
-
-    if player.facing == 1 and enemy.rect.centerx < player.rect.centerx:
-        return None
-
-    if player.facing == -1 and enemy.rect.centerx > player.rect.centerx:
-        return None
-
-    distance = math.hypot(
-        enemy.rect.centerx - player.rect.centerx,
-        enemy.rect.centery - player.rect.centery,
-    )
-    if distance <= skill_range:
-        return enemy
-
-    return None
-
-
-def activate_soul_anchor(player, skill, active_skill_effects):
+def activate_soul_anchor(player, skill, active_skill_effects, soul_anchor_loops):
     if player.is_dead or player.is_auto_grappling:
         return
 
@@ -785,10 +1322,21 @@ def activate_soul_anchor(player, skill, active_skill_effects):
         player.rect.center = player.soul_anchor_pos
         player.vel_x = 0
         player.vel_y = 0
+        return_position = player.rect.center
         player.soul_anchor_active = False
         player.soul_anchor_pos = None
         player.soul_anchor_timer = 0
-        active_skill_effects.append(SkillCircleEffect(player.rect.center, 34, (120, 255, 180)))
+        soul_anchor_loops.clear()
+        active_skill_effects.append(
+            SkillSpriteEffect(
+                "soul_anchor_return",
+                return_position,
+                duration=0.4,
+                anchor="midbottom",
+            )
+        )
+        print("Soul Anchor return position:", return_position)
+        print("Soul Anchor anchor timer:", player.soul_anchor_timer)
         print("Returned to Soul Anchor")
         return
 
@@ -796,7 +1344,18 @@ def activate_soul_anchor(player, skill, active_skill_effects):
     player.soul_anchor_active = True
     player.soul_anchor_pos = player.rect.center
     player.soul_anchor_timer = SOUL_ANCHOR_DURATION
-    active_skill_effects.append(SkillCircleEffect(player.soul_anchor_pos, 28, (120, 255, 180)))
+    soul_anchor_loops.clear()
+    soul_anchor_loops.append(SoulAnchorLoop(player.soul_anchor_pos, SOUL_ANCHOR_DURATION))
+    active_skill_effects.append(
+        SkillSpriteEffect(
+            "soul_anchor_place",
+            player.soul_anchor_pos,
+            duration=0.4,
+            anchor="midbottom",
+        )
+    )
+    print("Soul Anchor place position:", player.soul_anchor_pos)
+    print("Soul Anchor anchor timer:", player.soul_anchor_timer)
     print("Soul Anchor placed")
 
 
@@ -807,6 +1366,9 @@ def handle_enemy_attack(player, enemy):
     if player.is_auto_grappling:
         return
 
+    if hasattr(enemy, "attack_is_active") and not enemy.attack_is_active:
+        return
+
     enemy_attack_hitbox = enemy.get_attack_hitbox()
 
     if not enemy_attack_hitbox.colliderect(player.rect) or enemy.attack_has_hit:
@@ -814,7 +1376,7 @@ def handle_enemy_attack(player, enemy):
 
     weapon = get_weapon(player.current_weapon_id)
 
-    if weapon["id"] == "shield_weapon" and player.is_blocking and player.current_stamina > 0:
+    if weapon["id"] == "shield_weapon" and player.is_blocking:
         player.block_hit()
         enemy.attack_has_hit = True
         print("Blocked")
@@ -825,8 +1387,13 @@ def handle_enemy_attack(player, enemy):
         print("Parried")
         print("Perfect parry: enemy executable")
     else:
-        player.take_damage(ENEMY_DAMAGE)
+        player.take_damage(getattr(enemy, "damage", ENEMY_DAMAGE))
         enemy.attack_has_hit = True
+        if hasattr(enemy, "has_hit_player_this_attack"):
+            enemy.has_hit_player_this_attack = True
+            print("[MELEE HIT PLAYER]")
+            print("damage:", getattr(enemy, "damage", ENEMY_DAMAGE))
+            print("hitbox:", enemy_attack_hitbox)
 
 
 def handle_enemy_coin_drop(enemy, coins):
@@ -903,6 +1470,28 @@ def draw_interaction_text(screen, player, camera=None):
         pos = camera.apply_pos(pos)
     text_rect = text.get_rect(midbottom=pos)
     screen.blit(text, text_rect)
+
+
+def draw_player_debug_position(screen, player):
+    font = pygame.font.Font(None, 24)
+    lines = [
+        f"Player X: {player.rect.centerx}",
+        f"Player Y: {player.rect.bottom}",
+    ]
+    rendered_lines = [font.render(line, True, (255, 245, 150)) for line in lines]
+    padding = 10
+    line_gap = 4
+    width = max(line.get_width() for line in rendered_lines) + padding * 2
+    height = sum(line.get_height() for line in rendered_lines) + line_gap + padding * 2
+    panel_rect = pygame.Rect(screen.get_width() - width - 18, 18, width, height)
+
+    pygame.draw.rect(screen, (18, 20, 30), panel_rect)
+    pygame.draw.rect(screen, (100, 210, 255), panel_rect, 2)
+
+    y = panel_rect.y + padding
+    for line in rendered_lines:
+        screen.blit(line, (panel_rect.x + padding, y))
+        y += line.get_height() + line_gap
 
 
 def draw_moon_altar_interaction_text(screen, altar_rect, camera=None):
