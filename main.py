@@ -19,6 +19,14 @@ from settings import (
     ENERGY_BEAM_HEIGHT,
     ENERGY_BEAM_RANGE,
     EXECUTE_PARRY_WINDOW,
+    BOSS_PLAYER_SPAWN_X,
+    BOSS_PLAYER_SPAWN_Y,
+    BOSS_ROOM_HEIGHT,
+    BOSS_ROOM_MAX_X,
+    BOSS_ROOM_MAX_Y,
+    BOSS_ROOM_MIN_X,
+    BOSS_ROOM_MIN_Y,
+    BOSS_ROOM_WIDTH,
     NORMAL_PARRY_STUN_TIME,
     ORBIT_BLADE_COUNT,
     SCREEN_HEIGHT,
@@ -29,7 +37,8 @@ from settings import (
     SHOOTER_BULLET_SPEED,
     SOUL_ANCHOR_DURATION,
     SOUL_ANCHOR_RETURN_COST,
-    TIME_FREEZE_DURATION,
+    TIME_FREEZE_RADIUS,
+    TIME_FREEZE_STUN_DURATION,
     TITLE,
     WEAPON_SPECIAL_COOLDOWN,
     PIXELATE_GAME, 
@@ -38,8 +47,15 @@ from settings import (
 )
 from src.core.camera import Camera
 from src.entities.archer import ArcherEnemy
-from src.entities.boss import PaleCoreBoss
+from src.entities.boss import (
+    BOSS_ARENA_BOTTOM,
+    BOSS_ARENA_LEFT,
+    BOSS_ARENA_RIGHT,
+    BOSS_ARENA_TOP,
+    PaleCoreBoss,
+)
 from src.entities.enemy import Enemy
+from src.entities.mage import MageEnemy
 from src.entities.moon_shard import MoonShard
 from src.entities.player import Player
 from src.levels.level_manager import LevelManager
@@ -94,6 +110,14 @@ MELEE_SPAWNS = [
     {"x": 7233, "y": 650, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
     {"x": 8187, "y": 380, "mode": "patrol", "patrol_left": 80, "patrol_right": 80},
 ]
+MAGE_SPAWNS = [
+    {"x": 2216, "y": 300, "mode": "static"},
+    {"x": 5350, "y": 500, "mode": "static"},
+    {"x": 8840, "y": 420, "mode": "static"},
+]
+LEVEL5_BOSS_MAP_ID = 8
+BOSS_SECTION_BOUNDS = pygame.Rect(BOSS_ARENA_LEFT, BOSS_ARENA_TOP, BOSS_ARENA_RIGHT - BOSS_ARENA_LEFT, BOSS_ARENA_BOTTOM - BOSS_ARENA_TOP)
+BOSS_SECTION_SPAWN = (BOSS_PLAYER_SPAWN_X, BOSS_PLAYER_SPAWN_Y)
 
 
 def main():
@@ -145,6 +169,9 @@ def main():
     enemy_debug_frame = 0
     game_state = "menu"
     show_player_debug_overlay = False
+    killed_enemy_ids = set()
+    boss_section_locked = False
+    boss_room_debug_printed = False
 
     
     dev_teleport = DevTeleport()
@@ -177,6 +204,71 @@ def main():
         camera.snap_to(player.rect)
         moon_shard.reset_to(player.rect, player.facing)
 
+    def current_map_is_shop_safe():
+        current = level_manager.get_current_map()
+        return current.shop_rect is not None or current.map_type in ("checkpoint_stage", "rest_stage")
+
+    def enemy_was_killed(removed_enemy):
+        enemy_id = getattr(removed_enemy, "enemy_id", None)
+        if not enemy_id:
+            return
+        if enemy_id not in killed_enemy_ids:
+            killed_enemy_ids.add(enemy_id)
+            print("[ENEMY KILLED]", enemy_id)
+
+    def should_skip_dead_spawn(enemy_id):
+        if enemy_id in killed_enemy_ids:
+            print("[SKIP DEAD ENEMY SPAWN]", enemy_id)
+            return True
+        return False
+
+    def clamp_player_to_boss_section():
+        if not boss_section_locked:
+            return
+
+        if player.rect.left < BOSS_SECTION_BOUNDS.left:
+            player.rect.left = BOSS_SECTION_BOUNDS.left
+            player.vel_x = max(0, player.vel_x)
+        if player.rect.right > BOSS_SECTION_BOUNDS.right:
+            player.rect.right = BOSS_SECTION_BOUNDS.right
+            player.vel_x = min(0, player.vel_x)
+        if player.rect.top < BOSS_SECTION_BOUNDS.top:
+            player.rect.top = BOSS_SECTION_BOUNDS.top
+            player.vel_y = max(0, player.vel_y)
+        if player.rect.bottom > BOSS_SECTION_BOUNDS.bottom:
+            player.rect.bottom = BOSS_SECTION_BOUNDS.bottom
+            player.vel_y = 0
+            player.on_ground = True
+
+    def enter_boss_final_section():
+        nonlocal boss_section_locked, boss_room_debug_printed
+        if not enter_map(LEVEL5_BOSS_MAP_ID):
+            return False
+
+        boss_section_locked = True
+        player.rect.midbottom = BOSS_SECTION_SPAWN
+        player.vel_x = 0
+        player.vel_y = 0
+        clamp_player_to_boss_section()
+        camera.set_bounds(BOSS_SECTION_BOUNDS)
+        camera.snap_to(player.rect)
+        pale_core_boss.active = False
+        if not boss_room_debug_printed:
+            print("[BOSS ROOM BOUNDS]", BOSS_ROOM_MIN_X, BOSS_ROOM_MAX_X, BOSS_ROOM_MIN_Y, BOSS_ROOM_MAX_Y)
+            print("[BOSS ROOM SIZE]", BOSS_ROOM_WIDTH, BOSS_ROOM_HEIGHT)
+            print(
+                "[BOSS BG SIZE]",
+                pale_core_boss.boss_room_background_source_size,
+                "scaled to",
+                pale_core_boss.boss_room_background.get_size() if pale_core_boss.boss_room_background else None,
+            )
+            print("[BOSS CORE RECT]", pale_core_boss.boss_core_rect)
+            print("[BOSS HEAD RECT]", pale_core_boss.boss_head_rect)
+            print("[WEAK POINT IMAGE REMOVED] using lunar core glow")
+            boss_room_debug_printed = True
+        print("[BOSS SECTION LOCKED]", BOSS_SECTION_BOUNDS)
+        return True
+
     def debug_remove_enemy(reason, removed_enemy):
         hp = getattr(removed_enemy, "current_hp", getattr(removed_enemy, "hp", None))
         print("[ENEMY REMOVED]", reason, removed_enemy.rect, hp)
@@ -203,7 +295,12 @@ def main():
         patrol_left=80,
         patrol_right=80,
         index=None,
+        enemy_id=None,
     ):
+        enemy_id = enemy_id or f"{enemy_type}_{index if index is not None else len(enemies) + 1}"
+        if should_skip_dead_spawn(enemy_id):
+            return None
+
         normal_enemy = Enemy(
             x,
             y,
@@ -213,6 +310,7 @@ def main():
             index=index,
             debug_ai=DEBUG_ENEMY_AI,
         )
+        normal_enemy.enemy_id = enemy_id
         enemies.append(normal_enemy)
         print("[ENEMY CREATED]")
         print("Enemy type:", enemy_type)
@@ -224,6 +322,10 @@ def main():
     def spawn_level_enemies():
         enemies.clear()
         current_level = level_manager.get_current_map()
+        if current_map_is_shop_safe():
+            print("[SHOP ROOM] enemies disabled")
+            return
+
         level_name = current_level.name
         map_name = f"map{current_level.map_id}"
         enemy_spawns = list(current_level.enemy_spawns or [])
@@ -237,7 +339,7 @@ def main():
         print("Enemy spawn count:", len(enemy_spawns))
         print_room_clear_debug()
 
-        for spawn in enemy_spawns:
+        for index, spawn in enumerate(enemy_spawns, start=1):
             enemy_type = "normal"
             if isinstance(spawn, dict):
                 enemy_type = spawn.get("type", "normal")
@@ -245,7 +347,7 @@ def main():
                 y = spawn.get("y", player.rect.y)
             else:
                 x, y = spawn
-            create_normal_enemy(enemy_type, int(x), int(y))
+            create_normal_enemy(enemy_type, int(x), int(y), index=index, enemy_id=f"{enemy_type}_{index}")
 
         if DEBUG_FORCE_TEST_ENEMY and len(enemies) == 0:
             test_x = player.rect.centerx + 300
@@ -281,6 +383,10 @@ def main():
 
     def spawn_map_archers():
         archers.clear()
+        if current_map_is_shop_safe():
+            print("[SHOP ROOM] archers disabled")
+            return
+
         spawn_points = []
 
         if not ENEMY_SPAWN_PATH.exists():
@@ -320,6 +426,9 @@ def main():
             mode = spawn.get("mode", "patrol")
             patrol_left = spawn.get("patrol_left", 120)
             patrol_right = spawn.get("patrol_right", 120)
+            enemy_id = f"archer_{index}"
+            if should_skip_dead_spawn(enemy_id):
+                continue
             archer = ArcherEnemy(
                 x,
                 y,
@@ -329,6 +438,7 @@ def main():
                 index=index,
                 debug_ai=DEBUG_ENEMY_AI,
             )
+            archer.enemy_id = enemy_id
             archers.append(archer)
             print("[ARCHER CREATED]", index, x, y, archer.rect)
             print("[ARCHER CONFIG]", index, mode, x, y, archer.patrol_min_x, archer.patrol_max_x)
@@ -337,6 +447,10 @@ def main():
 
     def spawn_map_melees():
         current_map = level_manager.get_current_map()
+        if current_map_is_shop_safe():
+            print("[SHOP ROOM] melees disabled")
+            return
+
         if current_map.map_id not in (0, 1):
             return
 
@@ -355,13 +469,51 @@ def main():
                 patrol_left=spawn.get("patrol_left", 80),
                 patrol_right=spawn.get("patrol_right", 80),
                 index=index,
+                enemy_id=f"melee_{index}",
             )
+            if melee is None:
+                continue
             print("[MELEE CREATED]", index, x, y, mode, melee.rect)
 
         print("Total enemies after melee spawn:", len(enemies))
         print("Total all enemies after melee spawn:", len(enemies) + len(archers))
 
+    def spawn_map_mages():
+        current_map = level_manager.get_current_map()
+        if current_map_is_shop_safe():
+            print("[SHOP ROOM] mages disabled")
+            return
+
+        if current_map.map_id not in (0, 1):
+            return
+
+        print("[MAGE SPAWN SETUP]")
+        print("Mage spawn count:", len(MAGE_SPAWNS))
+
+        for index, spawn in enumerate(MAGE_SPAWNS, start=1):
+            x = spawn["x"]
+            y = spawn["y"]
+            mode = spawn.get("mode", "static")
+            enemy_id = f"mage_{index}"
+            if should_skip_dead_spawn(enemy_id):
+                continue
+            mage = MageEnemy(
+                x,
+                y,
+                mode=mode,
+                index=index,
+                debug_ai=DEBUG_ENEMY_AI,
+            )
+            mage.enemy_id = enemy_id
+            enemies.append(mage)
+            print("[MAGE CREATED]", index, x, y, mode, mage.rect)
+
+        print("Total enemies after mage spawn:", len(enemies))
+
     def enter_map(target_map_id):
+        nonlocal boss_section_locked
+        boss_section_locked = False
+        camera.clear_bounds()
         changed = level_manager.change_map(target_map_id, player, enemy, camera)
         if not changed:
             return False
@@ -370,6 +522,11 @@ def main():
         spawn_level_enemies()
         spawn_map_archers()
         spawn_map_melees()
+        spawn_map_mages()
+        if current_map_is_shop_safe():
+            enemies.clear()
+            archers.clear()
+            print("[SHOP ROOM] enemies disabled")
         shop.close()
         shop_rect = level_manager.get_shop_rect()
         if shop_rect is not None:
@@ -380,7 +537,11 @@ def main():
         return True
 
     def restart_game():
-        nonlocal game_state
+        nonlocal game_state, boss_section_locked, boss_room_debug_printed
+        killed_enemy_ids.clear()
+        boss_section_locked = False
+        boss_room_debug_printed = False
+        camera.clear_bounds()
         player.current_hp = player.max_hp
         player.hp = player.current_hp
         player.current_mana = player.max_mana
@@ -440,6 +601,10 @@ def main():
             elif event.type == pygame.KEYDOWN:
 
                 if event.key == pygame.K_F3:
+                    dev_teleport.toggle()
+                    continue
+
+                if event.key == pygame.K_F4 and not dev_teleport.visible:
                     show_player_debug_overlay = not show_player_debug_overlay
                     continue
 
@@ -478,11 +643,15 @@ def main():
                     if level_manager.use_moon_altar(player):
                         pass
                     elif shop_active and shop.can_interact(player):
-                        shop.toggle()
+                        if not shop.buy_nearby_product(player):
+                            shop.toggle()
                     elif nearby_door is not None:
                         target_map = nearby_door["target_map"]
                         if isinstance(target_map, int):
-                            enter_map(target_map)
+                            if current_map_is_shop_safe():
+                                enter_boss_final_section()
+                            else:
+                                enter_map(target_map)
                         elif target_map == "victory":
                             game_state = "victory"
                     else:
@@ -551,6 +720,9 @@ def main():
                 print("[ENEMY UPDATE COUNT]", len(enemies) + len(archers))
             current_map = level_manager.get_current_map()
             pale_core_boss.update_activation(current_map.map_id, player)
+            if current_map.map_id == LEVEL5_BOSS_MAP_ID and pale_core_boss.active and not boss_section_locked:
+                boss_section_locked = True
+                camera.set_bounds(BOSS_SECTION_BOUNDS)
 
             if grapple_special_timer > 0:
                 grapple_special_timer -= dt
@@ -558,8 +730,7 @@ def main():
                 grapple_special_hitbox = None
 
             for domain in time_freeze_domains:
-                for normal_enemy in enemies:
-                    domain.update(dt, normal_enemy)
+                domain.update(dt)
             time_freeze_domains = [domain for domain in time_freeze_domains if domain.alive]
 
             for normal_enemy in enemies:
@@ -590,7 +761,10 @@ def main():
                 if auto_door is not None:
                     target_map = auto_door["target_map"]
                     if isinstance(target_map, int):
-                        enter_map(target_map)
+                        if current_map_is_shop_safe():
+                            enter_boss_final_section()
+                        else:
+                            enter_map(target_map)
                     elif target_map == "victory":
                         game_state = "victory"
                     current_map = level_manager.get_current_map()
@@ -600,6 +774,7 @@ def main():
                 kill_player_instantly(player)
 
             clamp_player_to_map(player, current_map)
+            clamp_player_to_boss_section()
 
             if k_pressed and not map_changed:
                 activate_current_skill(
@@ -657,18 +832,24 @@ def main():
             update_returning_shield_archer_hits(returning_shields, archers)
             update_returning_shield_boss_hits(returning_shields, pale_core_boss)
             update_archer_arrows(archer_arrows, dt, player)
-            update_orbit_blades(active_orbit_blades, dt, player, enemies, active_skill_effects)
+            update_orbit_blades(active_orbit_blades, dt, player, enemies, archers, active_skill_effects)
             update_orbit_blade_boss_hits(active_orbit_blades, pale_core_boss)
-            for archer in archers:
-                if not archer.alive:
-                    debug_remove_enemy("dead", archer)
-            archers = [archer for archer in archers if archer.alive]
             returning_shields = [shield for shield in returning_shields if shield.alive]
             active_orbit_blades = [blade for blade in active_orbit_blades if blade.alive]
             player.has_active_shield_throw = len(returning_shields) > 0
             for normal_enemy in enemies:
                 handle_enemy_attack(player, normal_enemy)
                 handle_enemy_coin_drop(normal_enemy, coins)
+                if not normal_enemy.alive:
+                    enemy_was_killed(normal_enemy)
+                    debug_remove_enemy("dead", normal_enemy)
+            for archer in archers:
+                handle_enemy_coin_drop(archer, coins)
+                if not archer.alive:
+                    enemy_was_killed(archer)
+                    debug_remove_enemy("dead", archer)
+            enemies = [normal_enemy for normal_enemy in enemies if normal_enemy.alive]
+            archers = [archer for archer in archers if archer.alive]
             update_coins(coins, dt, platforms, player)
             coins = [coin for coin in coins if not coin.collected]
             projectiles = [projectile for projectile in projectiles if projectile.alive]
@@ -810,7 +991,7 @@ def main():
             draw_moon_altar_interaction_text(screen, level_manager.get_moon_altar_rect(), camera)
 
         if shop_active and shop.can_interact(player) and not shop.is_open:
-            draw_shop_interaction_text(screen, shop, camera)
+            draw_shop_interaction_text(screen, shop, player, camera)
 
         nearby_door = level_manager.check_doors(player)
         if nearby_door is not None:
@@ -1000,10 +1181,15 @@ def handle_player_attack_boss(player, boss):
         return
 
     attack_hitbox = player.get_attack_hitbox()
+    damage, is_critical = calculate_damage(player, weapon["damage"])
+    hit_hand = boss.take_hand_damage_at_rect(attack_hitbox, damage)
+    if hit_hand is not None:
+        player.attack_has_hit = True
+        return
+
     if not attack_hitbox.colliderect(boss.weakpoint_rect):
         return
 
-    damage, is_critical = calculate_damage(player, weapon["damage"])
     if boss.take_damage(damage):
         player.attack_has_hit = True
         if is_critical:
@@ -1115,6 +1301,12 @@ def update_projectile_boss_hits(projectiles, boss, projectile_hit_effects):
     for projectile in projectiles:
         if not projectile.alive:
             continue
+        hit_hand = boss.take_hand_damage_at_rect(projectile.rect, projectile.damage)
+        if hit_hand is not None:
+            projectile_hit_effects.append(ProjectileHitEffect(projectile.rect.center))
+            projectile.alive = False
+            print(f"Projectile hit Pale Core {hit_hand.name} hand for {projectile.damage} damage")
+            continue
         if projectile.rect.colliderect(boss.weakpoint_rect) and boss.take_damage(projectile.damage):
             projectile_hit_effects.append(ProjectileHitEffect(projectile.rect.center))
             projectile.alive = False
@@ -1141,9 +1333,18 @@ def update_returning_shield_boss_hits(returning_shields, boss):
     for shield in returning_shields:
         if not shield.alive or shield.hit_cooldown_timer > 0:
             continue
-        if not shield.rect.colliderect(boss.weakpoint_rect):
+        hit_hand = boss.take_hand_damage_at_rect(shield.rect, shield.damage)
+        if hit_hand is not None:
+            shield.hit_cooldown_timer = 0.18
+            if shield.returning:
+                shield.hit_boss_returning = True
+            else:
+                shield.hit_boss_outgoing = True
+            print(f"Shield hit Pale Core {hit_hand.name} hand for {shield.damage} damage")
             continue
 
+        if not shield.rect.colliderect(boss.weakpoint_rect):
+            continue
         if not shield.returning:
             if getattr(shield, "hit_boss_outgoing", False):
                 continue
@@ -1161,13 +1362,10 @@ def update_returning_shield_boss_hits(returning_shields, boss):
             print(f"Shield returning hit Pale Core weakpoint for {shield.damage} damage")
 
 
-def update_orbit_blades(active_orbit_blades, dt, player, enemies, active_skill_effects):
+def update_orbit_blades(active_orbit_blades, dt, player, enemies, archers, active_skill_effects):
+    targets = [enemy for enemy in enemies + archers if getattr(enemy, "alive", False)]
     for blade in active_orbit_blades:
-        target_enemy = get_nearest_alive_enemy(blade.rect.center, enemies)
-        if target_enemy is not None:
-            blade.update(dt, player, target_enemy)
-        else:
-            blade.update(dt, player, Enemy(-99999, -99999))
+        blade.update(dt, player, targets)
         if getattr(blade, "hit_effect", None) is not None:
             active_skill_effects.append(blade.hit_effect)
             blade.hit_effect = None
@@ -1179,6 +1377,13 @@ def update_orbit_blade_boss_hits(active_orbit_blades, boss):
 
     for blade in active_orbit_blades:
         if not blade.alive or getattr(blade, "has_hit", False):
+            continue
+        hit_hand = boss.take_hand_damage_at_rect(blade.rect, blade.damage)
+        if hit_hand is not None:
+            blade.has_hit = True
+            blade.alive = False
+            blade.state = "dead"
+            print(f"Orbit blade hit Pale Core {hit_hand.name} hand for {blade.damage} damage")
             continue
         if blade.rect.colliderect(boss.weakpoint_rect) and boss.take_damage(blade.damage):
             blade.has_hit = True
@@ -1235,9 +1440,11 @@ def activate_current_skill(
 
     if skill["skill_type"] == "time_freeze":
         player.spend_skill_cost(skill)
-        time_freeze_domains.append(TimeFreezeDomain(player.rect.center, TIME_FREEZE_DURATION))
-        print("Time Freeze freeze center:", player.rect.center)
-        print("Time Freeze")
+        time_freeze_domains.append(TimeFreezeDomain(player.rect.midbottom))
+        stunned_count = apply_time_freeze_to_enemies(player.rect.center, enemies + archers)
+        print("[TIME FREEZE ACTIVATE]")
+        print("Freeze radius:", TIME_FREEZE_RADIUS)
+        print("Enemies stunned:", stunned_count)
 
     elif skill["skill_type"] == "orbit_blades":
         player.spend_skill_cost(skill)
@@ -1253,32 +1460,22 @@ def activate_current_skill(
         for normal_enemy in enemies:
             if normal_enemy.alive and beam_rect.colliderect(normal_enemy.rect):
                 normal_enemy.take_damage(ENERGY_BEAM_DAMAGE)
-                active_skill_effects.append(
-                    SkillSpriteEffect("energy_beam_hit", normal_enemy.rect.center, duration=0.35)
-                )
                 enemies_hit += 1
                 print("Energy Beam hit enemy")
         for archer in archers:
             if archer.alive and beam_rect.colliderect(archer.rect):
                 archer.take_damage(ENERGY_BEAM_DAMAGE)
-                active_skill_effects.append(
-                    SkillSpriteEffect("energy_beam_hit", archer.rect.center, duration=0.35)
-                )
                 enemies_hit += 1
                 print("Energy Beam hit archer")
+        hit_hand = boss.take_hand_damage_at_rect(beam_rect, ENERGY_BEAM_DAMAGE) if boss.active and not boss.defeated else None
+        if hit_hand is not None:
+            enemies_hit += 1
+            print(f"Energy Beam hit Pale Core {hit_hand.name} hand")
         if boss.active and not boss.defeated and beam_rect.colliderect(boss.weakpoint_rect):
             if boss.take_damage(ENERGY_BEAM_DAMAGE):
-                active_skill_effects.append(
-                    SkillSpriteEffect("energy_beam_hit", boss.weakpoint_rect.center, duration=0.35)
-                )
                 enemies_hit += 1
                 print("Energy Beam hit Pale Core weakpoint")
-        if enemies_hit == 0:
-            hit_x = beam_rect.right if player.facing == 1 else beam_rect.left
-            active_skill_effects.append(
-                SkillSpriteEffect("energy_beam_hit", (hit_x, beam_rect.centery), duration=0.25)
-            )
-        active_skill_effects.append(EnergyBeamEffect(beam_rect, player.facing))
+        active_skill_effects.append(EnergyBeamEffect(player, get_energy_beam_rect, get_energy_beam_origin, player.facing))
         print("Energy Beam beam rect:", beam_rect)
         print("Energy Beam enemies hit count:", enemies_hit)
 
@@ -1290,21 +1487,49 @@ def get_skill_loaded_frame_count(skill_type):
     asset_keys = {
         "time_freeze": ["time_freeze_ready", "time_freeze_action", "time_freeze_loop"],
         "orbit_blades": ["orbit_blades_ready", "orbit_blade_projectile", "orbit_blade_hit"],
-        "energy_beam": ["energy_beam_ready", "energy_beam_attack", "energy_beam_hit"],
+        "energy_beam": ["energy_beam_ready", "energy_beam_attack"],
         "soul_anchor": ["soul_anchor_ready", "soul_anchor_place", "soul_anchor_loop", "soul_anchor_return"],
     }
     return {asset_key: len(get_skill_frames(asset_key)) for asset_key in asset_keys.get(skill_type, [])}
 
 
+def apply_time_freeze_to_enemies(center, targets):
+    stunned_count = 0
+    for enemy in targets:
+        if not getattr(enemy, "alive", False):
+            continue
+        distance = math.hypot(enemy.rect.centerx - center[0], enemy.rect.centery - center[1])
+        if distance > TIME_FREEZE_RADIUS:
+            continue
+
+        if hasattr(enemy, "freeze"):
+            enemy.freeze(TIME_FREEZE_STUN_DURATION)
+        elif hasattr(enemy, "stun"):
+            enemy.stun(TIME_FREEZE_STUN_DURATION)
+        print("[ENEMY STUNNED]", getattr(enemy, "enemy_id", None), TIME_FREEZE_STUN_DURATION)
+        stunned_count += 1
+    return stunned_count
+
+
 def get_energy_beam_rect(player):
-    y = player.rect.centery - ENERGY_BEAM_HEIGHT // 2
+    origin_x, origin_y = get_energy_beam_origin(player)
+    y = origin_y - ENERGY_BEAM_HEIGHT // 2
 
     if player.facing == 1:
-        x = player.rect.centerx
+        x = origin_x
     else:
-        x = player.rect.centerx - ENERGY_BEAM_RANGE
+        x = origin_x - ENERGY_BEAM_RANGE
 
     return pygame.Rect(x, y, ENERGY_BEAM_RANGE, ENERGY_BEAM_HEIGHT)
+
+
+def get_energy_beam_origin(player):
+    offset_x = 35
+    offset_y = -10
+    return (
+        player.rect.centerx + offset_x * player.facing,
+        player.rect.centery + offset_y,
+    )
 
 
 def activate_soul_anchor(player, skill, active_skill_effects, soul_anchor_loops):
@@ -1319,10 +1544,10 @@ def activate_soul_anchor(player, skill, active_skill_effects, soul_anchor_loops)
         if not player.debug_unlimited_mana:
             player.current_mana -= SOUL_ANCHOR_RETURN_COST
 
-        player.rect.center = player.soul_anchor_pos
+        player.rect.midbottom = player.soul_anchor_pos
         player.vel_x = 0
         player.vel_y = 0
-        return_position = player.rect.center
+        return_position = player.rect.midbottom
         player.soul_anchor_active = False
         player.soul_anchor_pos = None
         player.soul_anchor_timer = 0
@@ -1342,7 +1567,7 @@ def activate_soul_anchor(player, skill, active_skill_effects, soul_anchor_loops)
 
     player.spend_skill_cost(skill)
     player.soul_anchor_active = True
-    player.soul_anchor_pos = player.rect.center
+    player.soul_anchor_pos = player.rect.midbottom
     player.soul_anchor_timer = SOUL_ANCHOR_DURATION
     soul_anchor_loops.clear()
     soul_anchor_loops.append(SoulAnchorLoop(player.soul_anchor_pos, SOUL_ANCHOR_DURATION))
@@ -1400,9 +1625,7 @@ def handle_enemy_coin_drop(enemy, coins):
     if enemy.alive or enemy.dropped_coins:
         return
 
-    coins.append(Coin(enemy.rect.centerx - 20, enemy.rect.centery, COIN_VALUE))
     coins.append(Coin(enemy.rect.centerx, enemy.rect.centery, COIN_VALUE))
-    coins.append(Coin(enemy.rect.centerx + 20, enemy.rect.centery, COIN_VALUE))
     enemy.dropped_coins = True
 
 
@@ -1503,9 +1726,9 @@ def draw_moon_altar_interaction_text(screen, altar_rect, camera=None):
     screen.blit(text, text.get_rect(center=pos))
 
 
-def draw_shop_interaction_text(screen, shop, camera=None):
+def draw_shop_interaction_text(screen, shop, player, camera=None):
     font = pygame.font.Font(None, 30)
-    text = font.render("Press E to open shop", True, (255, 245, 180))
+    text = font.render(shop.get_nearby_prompt(player), True, (255, 245, 180))
     pos = (shop.rect.centerx, shop.rect.top - 12)
     if camera:
         pos = camera.apply_pos(pos)
