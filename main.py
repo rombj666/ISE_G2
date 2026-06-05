@@ -65,7 +65,9 @@ from src.systems.skills import (
 )
 from src.systems.weapons import get_weapon
 from src.ui.main_menu import MainMenu
+from src.ui.origin_story import OriginStory
 from src.ui.pause_menu import PauseMenu
+from src.ui.dialogue import DialogueSystem
 from src.ui.ui import draw_player_ui, draw_skill_boxes, draw_weapon_boxes
 
 
@@ -149,6 +151,8 @@ def main():
     
     dev_teleport = DevTeleport()
     main_menu = MainMenu()
+    origin_story = OriginStory()
+    dialogue = DialogueSystem()
     pause_menu = PauseMenu()
 
     def teleport_player_to(target):
@@ -392,6 +396,8 @@ def main():
         player.vel_x = 0
         player.vel_y = 0
         enter_map(0)
+        dialogue.reset_for_new_run()
+        dialogue.start("opening")
         game_state = "playing"
 
     running = True
@@ -416,11 +422,28 @@ def main():
                     main_menu.handle_event(event)
                 continue
 
+            if game_state == "origin_story":
+                if event.type == pygame.QUIT:
+                    running = False
+                else:
+                    origin_story.handle_event(event)
+                continue
+
             if game_state == "paused":
                 if event.type == pygame.QUIT:
                     running = False
                 else:
                     pause_menu.handle_event(event)
+                continue
+
+            if game_state == "playing" and dialogue.active:
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    game_state = "paused"
+                    pause_menu.reset_flags()
+                else:
+                    dialogue.handle_event(event)
                 continue
 
             if event.type == pygame.QUIT:
@@ -501,10 +524,32 @@ def main():
 
             if main_menu.should_start_game:
                 main_menu.should_start_game = False
-                restart_game()
+                origin_story.open()
+                game_state = "origin_story"
+                continue
 
             main_menu.update(dt)
             main_menu.draw(screen)
+
+            if PIXELATE_GAME:
+                small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
+                pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                window.blit(pixel_surface, (0, 0))
+            else:
+                window.blit(screen, (0, 0))
+
+            pygame.display.flip()
+            continue
+
+        if game_state == "origin_story":
+            origin_story.update(dt)
+
+            if origin_story.should_start_game:
+                origin_story.should_start_game = False
+                restart_game()
+                continue
+
+            origin_story.draw(screen)
 
             if PIXELATE_GAME:
                 small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
@@ -544,7 +589,11 @@ def main():
         platforms = level_manager.get_platforms()
         fulcrums = level_manager.get_fulcrums()
 
-        if game_state == "playing" and not shop.is_open:
+        if game_state == "playing":
+            dialogue.check_triggers(player, current_map, enemies, archers, pale_core_boss)
+        dialogue.update(dt)
+
+        if game_state == "playing" and not shop.is_open and not dialogue.active:
             enemy_debug_frame += 1
             if enemy_debug_frame % 120 == 0:
                 print("[ENEMY RUNTIME COUNT]", len(enemies) + len(archers))
@@ -568,7 +617,7 @@ def main():
                 archer.update(dt, player, archer_arrows, platforms)
             pale_core_boss.update(dt, player)
 
-        if game_state == "playing" and not player.is_dead and not shop.is_open:
+        if game_state == "playing" and not player.is_dead and not shop.is_open and not dialogue.active:
             player.handle_input(keys)
             previous_map_id = current_map.map_id
             player.update(dt, platforms, keys)
@@ -686,7 +735,7 @@ def main():
         if game_state != "paused":
             camera.update(player.rect)
 
-        if game_state == "playing" and not shop.is_open:
+        if game_state == "playing" and not shop.is_open and not dialogue.active:
             for effect in active_skill_effects:
                 effect.update(dt)
             active_skill_effects = [effect for effect in active_skill_effects if effect.alive]
@@ -836,11 +885,13 @@ def main():
             small_surface = pygame.transform.scale(screen, (PIXEL_WIDTH, PIXEL_HEIGHT))
             pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
             window.blit(pixel_surface, (0, 0))
+            dialogue.draw(window)
             if DEBUG_MODE or show_player_debug_overlay:
                 draw_player_debug_position(window, player)
             # Draw dev tools after pixel scaling so F3 text stays readable.
             dev_teleport.draw(window)
         else:
+            dialogue.draw(screen)
             # Dev teleport overlay is drawn last so it sits on top of everything.
             dev_teleport.draw(screen)
             if DEBUG_MODE or show_player_debug_overlay:
