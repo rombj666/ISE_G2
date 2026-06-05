@@ -4,9 +4,11 @@ from pathlib import Path
 import pygame
 
 from settings import (
+    ENERGY_BEAM_ATTACK_OFFSET_X,
+    ENERGY_BEAM_ATTACK_OFFSET_Y,
+    ENERGY_BEAM_ATTACK_SCALE,
     ENERGY_BEAM_ATTACK_PATH,
     ENERGY_BEAM_DAMAGE,
-    ENERGY_BEAM_HIT_PATH,
     ENERGY_BEAM_READY_PATH,
     ORBIT_BLADE_DAMAGE,
     ORBIT_BLADE_FIRE_DELAY,
@@ -29,12 +31,34 @@ from settings import (
     TIME_FREEZE_LOOP_PATH,
     TIME_FREEZE_RADIUS,
     TIME_FREEZE_READY_PATH,
+    TIME_FREEZE_VISUAL_DURATION,
 )
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEBUG_OUTPUT_DIR = PROJECT_ROOT / "assets" / "processed" / "debug"
+SKILL_WRITE_DEBUG_PREVIEWS = False
 SKILL_FRAME_CACHE = {}
+
+PLAYER_SKILL_FRAME_COUNTS = {
+    "energy_beam_attack": 6,
+}
+
+TIME_FREEZE_ACTION_SIZE = (300, 210)
+
+ORBIT_READY_SIZE = (120, 120)
+ORBIT_PROJECTILE_SIZE = (82, 54)
+ORBIT_HIT_SIZE = (92, 76)
+
+ENERGY_BEAM_READY_SIZE = (120, 100)
+ENERGY_BEAM_ATTACK_SIZE = (360, 90)
+ENERGY_BEAM_READY_DURATION = 0.25
+ENERGY_BEAM_ATTACK_DURATION = 1.5
+ENERGY_BEAM_FRAME_DURATION = 0.12
+
+SOUL_ANCHOR_PLACE_SIZE = (150, 120)
+SOUL_ANCHOR_LOOP_SIZE = (118, 96)
+SOUL_ANCHOR_RETURN_SIZE = (130, 108)
 
 
 MANUAL_TIME_FREEZE_RECTS = {
@@ -51,8 +75,6 @@ MANUAL_ORBIT_BLADE_RECTS = {
 
 MANUAL_ENERGY_BEAM_RECTS = {
     "ready": None,
-    "attack": None,
-    "hit": None,
 }
 
 MANUAL_SOUL_ANCHOR_RECTS = {
@@ -107,91 +129,85 @@ SKILL_ASSETS = {
     "time_freeze_ready": {
         "label": "Time Freeze ready frames",
         "path": TIME_FREEZE_READY_PATH,
-        "target_size": (320, 240),
+        "target_size": (220, 150),
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_TIME_FREEZE_RECTS["ready"],
     },
     "time_freeze_action": {
         "label": "Time Freeze action frames",
         "path": TIME_FREEZE_ACTION_PATH,
-        "target_size": (360, 260),
+        "target_size": TIME_FREEZE_ACTION_SIZE,
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_TIME_FREEZE_RECTS["action"],
     },
     "time_freeze_loop": {
         "label": "Time Freeze loop frames",
         "path": TIME_FREEZE_LOOP_PATH,
-        "target_size": (360, 260),
+        "target_size": (240, 180),
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_TIME_FREEZE_RECTS["loop"],
     },
     "orbit_blades_ready": {
         "label": "Orbit Blades ready frames",
         "path": ORBIT_BLADES_READY_PATH,
-        "target_size": (220, 220),
+        "target_size": ORBIT_READY_SIZE,
         "crop_mode": "center_effect",
         "manual_rects": MANUAL_ORBIT_BLADE_RECTS["ready"],
     },
     "orbit_blade_projectile": {
         "label": "Orbit Blade projectile frames",
         "path": ORBIT_BLADE_PROJECTILE_PATH,
-        "target_size": (220, 120),
+        "target_size": ORBIT_PROJECTILE_SIZE,
         "crop_mode": "projectile",
         "manual_rects": MANUAL_ORBIT_BLADE_RECTS["projectile"],
     },
     "orbit_blade_hit": {
         "label": "Orbit Blade hit frames",
         "path": ORBIT_BLADE_HIT_PATH,
-        "target_size": (180, 140),
+        "target_size": ORBIT_HIT_SIZE,
         "crop_mode": "hit",
         "manual_rects": MANUAL_ORBIT_BLADE_RECTS["hit"],
     },
     "energy_beam_ready": {
         "label": "Energy Beam ready frames",
         "path": ENERGY_BEAM_READY_PATH,
-        "target_size": (220, 180),
+        "target_size": ENERGY_BEAM_READY_SIZE,
         "crop_mode": "center_effect",
         "manual_rects": MANUAL_ENERGY_BEAM_RECTS["ready"],
     },
     "energy_beam_attack": {
         "label": "Energy Beam attack frames",
         "path": ENERGY_BEAM_ATTACK_PATH,
-        "target_size": (520, 200),
+        "target_size": None,
         "crop_mode": "beam",
-        "manual_rects": MANUAL_ENERGY_BEAM_RECTS["attack"],
-    },
-    "energy_beam_hit": {
-        "label": "Energy Beam hit frames",
-        "path": ENERGY_BEAM_HIT_PATH,
-        "target_size": (200, 160),
-        "crop_mode": "hit",
-        "manual_rects": MANUAL_ENERGY_BEAM_RECTS["hit"],
+        "manual_rects": None,
+        "scale": ENERGY_BEAM_ATTACK_SCALE,
     },
     "soul_anchor_ready": {
         "label": "Soul Anchor ready frames",
         "path": SOUL_ANCHOR_READY_PATH,
-        "target_size": (300, 220),
+        "target_size": (120, 96),
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_SOUL_ANCHOR_RECTS["ready"],
     },
     "soul_anchor_place": {
         "label": "Soul Anchor place frames",
         "path": SOUL_ANCHOR_PLACE_PATH,
-        "target_size": (320, 240),
+        "target_size": SOUL_ANCHOR_PLACE_SIZE,
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_SOUL_ANCHOR_RECTS["place"],
     },
     "soul_anchor_loop": {
         "label": "Soul Anchor loop frames",
         "path": SOUL_ANCHOR_LOOP_PATH,
-        "target_size": (320, 240),
+        "target_size": SOUL_ANCHOR_LOOP_SIZE,
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_SOUL_ANCHOR_RECTS["loop"],
     },
     "soul_anchor_return": {
         "label": "Soul Anchor return frames",
         "path": SOUL_ANCHOR_RETURN_PATH,
-        "target_size": (320, 240),
+        "target_size": SOUL_ANCHOR_RETURN_SIZE,
         "crop_mode": "ground_effect",
         "manual_rects": MANUAL_SOUL_ANCHOR_RECTS["return"],
     },
@@ -216,32 +232,78 @@ def resolve_asset_path(path):
 
 
 def make_equal_source_rects(sheet, frame_count):
+    frame_width = sheet.get_width() // frame_count
+    if frame_width <= 0 or sheet.get_width() % frame_count != 0:
+        print(
+            "WARNING: Skill effect sheet width is not evenly divisible by frame count:",
+            sheet.get_size(),
+            "frames:",
+            frame_count,
+        )
+        frame_width = max(1, sheet.get_width() // frame_count)
+
     rects = []
     for index in range(frame_count):
-        left = round(index * sheet.get_width() / frame_count)
-        right = round((index + 1) * sheet.get_width() / frame_count)
-        rects.append(pygame.Rect(left, 0, right - left, sheet.get_height()))
+        rects.append(pygame.Rect(index * frame_width, 0, frame_width, sheet.get_height()))
     return rects
 
 
-def has_opaque_white_background(surface):
-    corner = surface.get_at((0, 0))
-    return corner.a == 255 and corner.r > 235 and corner.g > 235 and corner.b > 235
+def color_distance(color, sample):
+    return abs(color.r - sample.r) + abs(color.g - sample.g) + abs(color.b - sample.b)
 
 
-def repair_opaque_white_background(surface):
-    if not has_opaque_white_background(surface):
-        return surface
+def is_generated_background_color(color, background_samples):
+    if color.a < 255:
+        return False
 
-    print("Effect PNG background is not transparent. Regenerate/export as transparent PNG.")
+    for sample in background_samples:
+        if color_distance(color, sample) <= 42:
+            return True
+
+    spread = max(color.r, color.g, color.b) - min(color.r, color.g, color.b)
+    near_white = color.r >= 220 and color.g >= 220 and color.b >= 220 and spread <= 35
+    near_black = color.r <= 35 and color.g <= 35 and color.b <= 35
+    flat_gray = spread <= 16 and 36 <= color.r <= 225 and 36 <= color.g <= 225 and 36 <= color.b <= 225
+    return near_white or near_black or flat_gray
+
+
+def get_background_samples(surface):
+    width, height = surface.get_size()
+    if width <= 0 or height <= 0:
+        return []
+
+    points = [
+        (0, 0),
+        (width - 1, 0),
+        (0, height - 1),
+        (width - 1, height - 1),
+        (width // 2, 0),
+        (width // 2, height - 1),
+        (0, height // 2),
+        (width - 1, height // 2),
+    ]
+    return [surface.get_at(point) for point in points]
+
+
+def repair_generated_background(surface):
+    alpha_rect = surface.get_bounding_rect(min_alpha=1)
+    if alpha_rect.width <= 0 or alpha_rect.height <= 0:
+        return surface, 0
+
+    background_samples = get_background_samples(surface)
+    if not background_samples or any(sample.a < 255 for sample in background_samples):
+        return surface, 0
+
     repaired = surface.copy()
     width, height = repaired.get_size()
+    removed_pixels = 0
     for y in range(height):
         for x in range(width):
             color = repaired.get_at((x, y))
-            if color.a == 255 and color.r > 235 and color.g > 235 and color.b > 235:
-                repaired.set_at((x, y), (255, 255, 255, 0))
-    return repaired
+            if is_generated_background_color(color, background_samples):
+                repaired.set_at((x, y), (color.r, color.g, color.b, 0))
+                removed_pixels += 1
+    return repaired, removed_pixels
 
 
 def get_alpha_bounds(surface):
@@ -278,6 +340,8 @@ def place_on_canvas(surface, target_size, crop_mode):
 
     if crop_mode == "ground_effect":
         rect.midbottom = (target_size[0] // 2, target_size[1])
+    elif crop_mode == "beam":
+        rect.midleft = (0, target_size[1] // 2)
     else:
         rect.center = (target_size[0] // 2, target_size[1] // 2)
 
@@ -340,17 +404,21 @@ def load_skill_effect_sheet(
     sheet = pygame.image.load(str(resolved_path)).convert_alpha()
     source_rects = manual_rects or make_equal_source_rects(sheet, frame_count)
     frames = []
+    repaired_pixels_total = 0
 
     for source_rect in source_rects:
         raw_frame = pygame.Surface(source_rect.size, pygame.SRCALPHA)
         raw_frame.blit(sheet, (0, 0), source_rect)
-        raw_frame = repair_opaque_white_background(raw_frame)
+        raw_frame, repaired_pixels = repair_generated_background(raw_frame)
+        repaired_pixels_total += repaired_pixels
         cropped = crop_visible_pixels(raw_frame)
         frames.append(place_on_canvas(cropped, target_size, crop_mode))
 
     print("Skill loaded frame count:", len(frames))
+    if repaired_pixels_total > 0:
+        print("Repaired opaque skill PNG background:", resolved_path.name)
 
-    if debug_name:
+    if debug_name and SKILL_WRITE_DEBUG_PREVIEWS:
         draw_source_rect_debug(
             sheet,
             source_rects,
@@ -361,17 +429,96 @@ def load_skill_effect_sheet(
     return frames
 
 
+def load_fixed_frame_sheet(path, frame_count, scale=1.0, target_size=None, debug_name=None):
+    resolved_path = resolve_asset_path(path)
+    print("Skill fixed sheet file path:", resolved_path)
+    print("Skill fixed frame count:", frame_count)
+
+    if not resolved_path.exists():
+        print("Missing fixed effect sheet:", resolved_path)
+        return []
+
+    sheet = pygame.image.load(str(resolved_path)).convert_alpha()
+    frame_width = sheet.get_width() // frame_count
+    frame_height = sheet.get_height()
+    frames = []
+
+    for index in range(frame_count):
+        frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+        source_rect = pygame.Rect(index * frame_width, 0, frame_width, frame_height)
+        frame.blit(sheet, (0, 0), source_rect)
+        if target_size is not None:
+            frame = pygame.transform.smoothscale(frame, target_size)
+        elif scale != 1.0:
+            scaled_size = (
+                max(1, round(frame_width * scale)),
+                max(1, round(frame_height * scale)),
+            )
+            frame = pygame.transform.smoothscale(frame, scaled_size)
+        frames.append(frame)
+
+    print("Skill fixed loaded frame count:", len(frames))
+    print("Skill fixed frame size:", frames[0].get_size() if frames else None)
+    print("[LOAD]", resolved_path, "frames:", len(frames), "frame_size:", frames[0].get_size() if frames else None)
+    if debug_name == "energy_beam_attack" and frames:
+        print("[PLAYER BEAM ATTACK FRAMES]", len(frames), frames[0].get_size())
+
+    if debug_name and SKILL_WRITE_DEBUG_PREVIEWS:
+        source_rects = [pygame.Rect(i * frame_width, 0, frame_width, frame_height) for i in range(frame_count)]
+        draw_source_rect_debug(sheet, source_rects, DEBUG_OUTPUT_DIR / f"{debug_name}_source_rects.png")
+        draw_clean_debug(frames, DEBUG_OUTPUT_DIR / f"{debug_name}_clean_debug.png")
+
+    return frames
+
+
+def load_manual_rect_sheet(path, rects, scale=1.0, debug_name=None):
+    resolved_path = resolve_asset_path(path)
+    print("Skill manual rect sheet file path:", resolved_path)
+    print("Skill manual rect frame count:", len(rects))
+
+    if not resolved_path.exists():
+        print("Missing manual rect effect sheet:", resolved_path)
+        return []
+
+    sheet = pygame.image.load(str(resolved_path)).convert_alpha()
+    frames = []
+
+    for rect in rects:
+        x, y, width, height = rect
+        frame = pygame.Surface((width, height), pygame.SRCALPHA)
+        frame.blit(sheet, (0, 0), pygame.Rect(x, y, width, height))
+        if scale != 1.0:
+            frame = pygame.transform.smoothscale(
+                frame,
+                (max(1, round(width * scale)), max(1, round(height * scale))),
+            )
+        frames.append(frame)
+
+    print("[MANUAL RECT LOAD]", resolved_path, "frames:", len(frames), "rects:", rects)
+    print("[LOAD]", resolved_path, "frames:", len(frames), "frame_size:", frames[0].get_size() if frames else None)
+    return frames
+
+
 def get_skill_frames(asset_key):
     if asset_key not in SKILL_FRAME_CACHE:
         config = SKILL_ASSETS[asset_key]
-        SKILL_FRAME_CACHE[asset_key] = load_skill_effect_sheet(
-            config["path"],
-            frame_count=SKILL_EFFECT_FRAME_COUNT,
-            target_size=config["target_size"],
-            crop_mode=config["crop_mode"],
-            manual_rects=config["manual_rects"],
-            debug_name=asset_key,
-        )
+        if asset_key in PLAYER_SKILL_FRAME_COUNTS:
+            SKILL_FRAME_CACHE[asset_key] = load_fixed_frame_sheet(
+                config["path"],
+                PLAYER_SKILL_FRAME_COUNTS[asset_key],
+                scale=config.get("scale", 1.0),
+                target_size=config["target_size"],
+                debug_name=asset_key,
+            )
+        else:
+            SKILL_FRAME_CACHE[asset_key] = load_skill_effect_sheet(
+                config["path"],
+                frame_count=SKILL_EFFECT_FRAME_COUNT,
+                target_size=config["target_size"],
+                crop_mode=config["crop_mode"],
+                manual_rects=config["manual_rects"],
+                debug_name=asset_key,
+            )
     return SKILL_FRAME_CACHE[asset_key]
 
 
@@ -420,56 +567,48 @@ def blit_effect_frame(
     else:
         frame_rect.center = draw_pos
 
-    print("Drawing skill effect:", effect_name)
-    print("current frame index:", frame_index)
-    print("frame size:", image.get_size())
-    print("draw rect position:", frame_rect)
-
     screen.blit(image, frame_rect)
     return True
 
 
+def draw_anchored_frame(screen, frame, world_pos, camera=None, anchor="center", flip_x=False):
+    if frame is None:
+        return None
+
+    image = pygame.transform.flip(frame, True, False) if flip_x else frame
+    screen_pos = camera.apply_pos(world_pos) if camera else world_pos
+    rect = image.get_rect(**{anchor: screen_pos})
+    screen.blit(image, rect)
+    return rect
+
+
 class TimeFreezeDomain:
-    def __init__(self, center, duration):
+    def __init__(self, center, visual_duration=TIME_FREEZE_VISUAL_DURATION):
         self.center = center
         self.radius = TIME_FREEZE_RADIUS
-        self.timer = duration
+        self.visual_duration = visual_duration
+        self.timer = visual_duration
         self.elapsed = 0
-        self.action_duration = SKILL_EFFECT_FRAME_COUNT * 0.08
         self.alive = True
         print("Time Freeze freeze center:", self.center)
 
-    def update(self, dt, enemy):
+    def update(self, dt):
         self.timer -= dt
         self.elapsed += dt
         if self.timer <= 0:
             self.alive = False
-            return
-
-        frozen_count = 0
-        if enemy.alive:
-            distance = math.hypot(
-                enemy.rect.centerx - self.center[0],
-                enemy.rect.centery - self.center[1],
-            )
-            if distance <= self.radius:
-                enemy.freeze(0.1)
-                frozen_count = 1
-        if frozen_count:
-            print("Time Freeze enemies frozen count:", frozen_count)
 
     def draw(self, screen, camera=None):
-        if self.elapsed <= self.action_duration:
-            effect_name = "time_freeze_action"
-            frame, frame_index = get_animation_frame_info(effect_name, self.elapsed, loop=False)
-        else:
-            effect_name = "time_freeze_loop"
-            frame, frame_index = get_animation_frame_info(
-                effect_name,
-                self.elapsed - self.action_duration,
-                loop=True,
-            )
+        if self.elapsed > self.visual_duration:
+            return
 
+        effect_name = "time_freeze_action"
+        frame, frame_index = get_animation_frame_info(
+            effect_name,
+            self.elapsed,
+            frame_duration=self.visual_duration / max(1, len(get_skill_frames(effect_name))),
+            loop=False,
+        )
         if not blit_effect_frame(screen, effect_name, frame, frame_index, self.center, camera, anchor="midbottom"):
             center = camera.apply_pos(self.center) if camera else self.center
             pygame.draw.circle(screen, (80, 180, 255), center, self.radius, 3)
@@ -492,9 +631,10 @@ class OrbitBlade:
         self.facing = player.facing
         self.elapsed = 0
         self.hit_effect = None
+        self.target = None
         self.update_orbit_position(player)
 
-    def update(self, dt, player, enemy):
+    def update(self, dt, player, targets):
         if not self.alive:
             return
 
@@ -511,7 +651,7 @@ class OrbitBlade:
             self.update_orbit_position(player)
 
             if self.fire_delay <= 0:
-                target = self.find_target(enemy)
+                target = self.find_target(targets, player.rect.center)
                 if target is not None:
                     print("Orbit Blades target chosen:", target.rect.center)
                     self.fire_at(target.rect.center)
@@ -521,26 +661,38 @@ class OrbitBlade:
                 print("Orbit Blades projectile spawned:", self.index)
 
         elif self.state == "fired":
+            if self.target is None or not getattr(self.target, "alive", False):
+                self.target = self.find_target(targets, self.rect.center)
+            if self.target is not None:
+                self.fire_at(self.target.rect.center)
             self.rect.x += self.vel_x
             self.rect.y += self.vel_y
-            self.check_enemy_collision(enemy)
+            self.check_enemy_collision(targets)
 
     def update_orbit_position(self, player):
         x = player.rect.centerx + math.cos(self.angle) * ORBIT_BLADE_RADIUS
         y = player.rect.centery + math.sin(self.angle) * ORBIT_BLADE_RADIUS
         self.rect.center = (round(x), round(y))
 
-    def find_target(self, enemy):
-        if not enemy.alive:
+    def find_target(self, targets, origin):
+        alive_targets = [target for target in targets if getattr(target, "alive", False)]
+        if not alive_targets:
             return None
 
-        distance = math.hypot(
-            enemy.rect.centerx - self.rect.centerx,
-            enemy.rect.centery - self.rect.centery,
+        in_range = [
+            target for target in alive_targets
+            if math.hypot(target.rect.centerx - origin[0], target.rect.centery - origin[1]) <= ORBIT_BLADE_TARGET_RANGE
+        ]
+        if not in_range:
+            return None
+
+        in_range.sort(
+            key=lambda target: math.hypot(
+                target.rect.centerx - self.rect.centerx,
+                target.rect.centery - self.rect.centery,
+            )
         )
-        if distance <= ORBIT_BLADE_TARGET_RANGE:
-            return enemy
-        return None
+        return in_range[self.index % len(in_range)]
 
     def fire_at(self, target_center):
         dx = target_center[0] - self.rect.centerx
@@ -555,17 +707,22 @@ class OrbitBlade:
         self.vel_y = 0
         self.state = "fired"
 
-    def check_enemy_collision(self, enemy):
-        if not enemy.alive or self.has_hit:
+    def check_enemy_collision(self, targets):
+        if self.has_hit:
             return
 
-        if self.rect.colliderect(enemy.rect):
+        for enemy in targets:
+            if not getattr(enemy, "alive", False):
+                continue
+            if not self.rect.colliderect(enemy.rect):
+                continue
             enemy.take_damage(self.damage)
             self.has_hit = True
             self.alive = False
             self.state = "dead"
-            self.hit_effect = SkillSpriteEffect("orbit_blade_hit", self.rect.center, duration=0.35)
+            self.hit_effect = SkillSpriteEffect("orbit_blade_hit", self.rect.center, duration=0.25)
             print("Orbit blade hit enemy")
+            return
 
     def draw(self, screen, camera=None):
         if not self.alive:
@@ -594,33 +751,62 @@ class OrbitBlade:
 
 
 class EnergyBeamEffect:
-    def __init__(self, rect, facing=1):
-        self.rect = rect
+    def __init__(
+        self,
+        player,
+        get_rect_func,
+        get_origin_func,
+        facing=1,
+        ready_duration=ENERGY_BEAM_READY_DURATION,
+        active_duration=ENERGY_BEAM_ATTACK_DURATION,
+    ):
+        self.player = player
+        self.get_rect_func = get_rect_func
+        self.get_origin_func = get_origin_func
+        self.rect = get_rect_func(player)
         self.facing = facing
-        self.timer = SKILL_EFFECT_FRAME_COUNT * 0.08
+        self.ready_duration = ready_duration
+        self.active_duration = active_duration
+        self.timer = ready_duration + active_duration
         self.elapsed = 0
         self.alive = True
 
     def update(self, dt):
         self.timer -= dt
         self.elapsed += dt
+        self.rect = self.get_rect_func(self.player)
         if self.timer <= 0:
             self.alive = False
 
     def draw(self, screen, camera=None):
+        if self.elapsed < self.ready_duration:
+            effect_name = "energy_beam_ready"
+            frame, frame_index = get_animation_frame_info(effect_name, self.elapsed, loop=False)
+            origin = self.get_origin_func(self.player)
+            blit_effect_frame(screen, effect_name, frame, frame_index, origin, camera, flip_x=self.facing < 0)
+            return
+
         effect_name = "energy_beam_attack"
-        frame, frame_index = get_animation_frame_info(effect_name, self.elapsed, loop=False)
-        target_pos = self.rect.midleft if self.facing == 1 else self.rect.midright
-        anchor = "midleft" if self.facing == 1 else "midright"
-        if blit_effect_frame(
-            screen,
+        active_elapsed = self.elapsed - self.ready_duration
+        frame, frame_index = get_animation_frame_info(
             effect_name,
+            active_elapsed,
+            frame_duration=ENERGY_BEAM_FRAME_DURATION,
+            loop=True,
+        )
+        origin_x, origin_y = self.get_origin_func(self.player)
+        target_pos = (
+            origin_x + ENERGY_BEAM_ATTACK_OFFSET_X * self.facing,
+            origin_y + ENERGY_BEAM_ATTACK_OFFSET_Y,
+        )
+        anchor = "midleft" if self.facing == 1 else "midright"
+        if draw_anchored_frame(
+            screen,
             frame,
-            frame_index,
             target_pos,
             camera,
-            flip_x=self.facing < 0,
             anchor=anchor,
+            flip_x=self.facing < 0,
         ):
             return
 

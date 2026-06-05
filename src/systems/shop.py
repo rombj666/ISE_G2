@@ -1,32 +1,24 @@
 import math
-import random
 
 import pygame
 
-from settings import (
-    SCREEN_HEIGHT,
-    SCREEN_WIDTH,
-    SHOP_ATTACK_POTION_COST,
-    SHOP_ATTACK_POTION_INCREASE,
-    SHOP_ATTACK_POTION_MAX,
-    SHOP_CRIT_CHANCE_COST,
-    SHOP_CRIT_CHANCE_INCREASE,
-    SHOP_CRIT_CHANCE_MAX,
-    SHOP_CRIT_DAMAGE_COST,
-    SHOP_CRIT_DAMAGE_INCREASE,
-    SHOP_CRIT_DAMAGE_MAX,
-    SHOP_HEAL_COST,
-    SHOP_INTERACT_DISTANCE,
-    SHOP_MANA_COST,
-    SHOP_MAX_HP_COST,
-    SHOP_MAX_HP_INCREASE,
-    SHOP_MAX_MANA_COST,
-    SHOP_MAX_MANA_INCREASE,
-    SHOP_PRODUCT_SLOT_COUNT,
-    SHOP_RANDOM_SEED_ENABLED,
-    SHOP_SKILL_COST,
-    SHOP_WEAPON_COST,
-)
+from settings import SCREEN_HEIGHT, SCREEN_WIDTH, SHOP_INTERACT_DISTANCE
+
+
+SHOP_PRODUCTS = [
+    {
+        "id": "max_hp",
+        "name": "Max HP",
+        "cost": 10,
+        "description": "+50 Max HP",
+    },
+    {
+        "id": "max_mana",
+        "name": "Max Mana",
+        "cost": 10,
+        "description": "+50 Max Mana",
+    },
+]
 
 
 class Shop:
@@ -43,76 +35,34 @@ class Shop:
         self.rect = rect.copy()
 
     def refresh_products(self):
-        product_pool = self.build_product_pool()
-        if SHOP_RANDOM_SEED_ENABLED:
-            random.seed(1)
-        self.current_products = random.sample(product_pool, SHOP_PRODUCT_SLOT_COUNT)
-
-    def build_product_pool(self):
-        return [
-            self.make_weapon("light_weapon", "Light Weapon"),
-            self.make_weapon("heavy_weapon", "Heavy Weapon"),
-            self.make_weapon("shooter_weapon", "Shooter Weapon"),
-            self.make_weapon("shield_weapon", "Shield Weapon"),
-            self.make_weapon("grapple_weapon", "Grapple Weapon"),
-            self.make_skill("time_freeze", "Time Freeze"),
-            self.make_skill("orbit_blades", "Orbit Blades"),
-            self.make_skill("energy_beam", "Energy Beam"),
-            self.make_skill("soul_anchor", "Soul Anchor"),
-            {
-                "id": "heal_hp",
-                "name": "Heal HP",
-                "product_type": "recovery",
-                "cost": SHOP_HEAL_COST,
-                "recovery_type": "hp",
-            },
-            {
-                "id": "restore_mana",
-                "name": "Restore Mana",
-                "product_type": "recovery",
-                "cost": SHOP_MANA_COST,
-                "recovery_type": "mana",
-            },
-            self.make_upgrade("max_hp", "Max HP +20", SHOP_MAX_HP_COST),
-            self.make_upgrade("max_mana", "Max Mana +20", SHOP_MAX_MANA_COST),
-            self.make_upgrade("crit_chance", "Crit Chance +5%", SHOP_CRIT_CHANCE_COST),
-            self.make_upgrade("crit_damage", "Crit Damage +25%", SHOP_CRIT_DAMAGE_COST),
-            self.make_upgrade("attack_potion", "Attack Potion +10%", SHOP_ATTACK_POTION_COST),
-        ]
-
-    def make_weapon(self, weapon_id, name):
-        return {
-            "id": f"buy_{weapon_id}",
-            "name": name,
-            "product_type": "weapon",
-            "cost": SHOP_WEAPON_COST,
-            "weapon_id": weapon_id,
-        }
-
-    def make_skill(self, skill_id, name):
-        return {
-            "id": f"buy_{skill_id}",
-            "name": name,
-            "product_type": "skill",
-            "cost": SHOP_SKILL_COST,
-            "skill_id": skill_id,
-        }
-
-    def make_upgrade(self, upgrade_type, name, cost):
-        return {
-            "id": f"upgrade_{upgrade_type}",
-            "name": name,
-            "product_type": "upgrade",
-            "cost": cost,
-            "upgrade_type": upgrade_type,
-        }
+        self.current_products = [product.copy() for product in SHOP_PRODUCTS]
 
     def can_interact(self, player):
-        distance = math.hypot(
+        return self.nearby_product_index(player) is not None or math.hypot(
             player.rect.centerx - self.rect.centerx,
             player.rect.centery - self.rect.centery,
-        )
-        return distance <= SHOP_INTERACT_DISTANCE
+        ) <= SHOP_INTERACT_DISTANCE
+
+    def nearby_product_index(self, player):
+        for index, product_rect in enumerate(self.get_product_interaction_rects()):
+            if player.rect.colliderect(product_rect.inflate(48, 64)):
+                return index
+        return None
+
+    def get_product_positions(self):
+        center_y = self.rect.bottom - 18
+        return [
+            (self.rect.centerx - 120, center_y),
+            (self.rect.centerx + 120, center_y),
+        ]
+
+    def get_product_interaction_rects(self):
+        rects = []
+        for center_x, platform_y in self.get_product_positions():
+            rect = pygame.Rect(0, 0, 120, 110)
+            rect.midbottom = (center_x, platform_y + 8)
+            rects.append(rect)
+        return rects
 
     def open(self):
         self.is_open = True
@@ -138,17 +88,18 @@ class Shop:
         if event.key == pygame.K_ESCAPE:
             self.close()
             return
+        if event.key == pygame.K_1:
+            self.buy_product(0, player)
+        elif event.key == pygame.K_2:
+            self.buy_product(1, player)
 
-        key_to_index = {
-            pygame.K_1: 0,
-            pygame.K_2: 1,
-            pygame.K_3: 2,
-            pygame.K_4: 3,
-            pygame.K_5: 4,
-        }
+    def buy_nearby_product(self, player):
+        product_index = self.nearby_product_index(player)
+        if product_index is None:
+            return False
 
-        if event.key in key_to_index:
-            self.buy_product(key_to_index[event.key], player)
+        self.buy_product(product_index, player)
+        return True
 
     def buy_product(self, product_index, player):
         if product_index >= len(self.current_products):
@@ -158,115 +109,60 @@ class Shop:
         if not self.try_spend(player, product["cost"]):
             return
 
-        product_type = product["product_type"]
-
-        if product_type == "weapon":
-            player.switch_weapon(product["weapon_id"])
-        elif product_type == "skill":
-            player.switch_skill(product["skill_id"])
-        elif product_type == "recovery":
-            self.apply_recovery(player, product["recovery_type"])
-        elif product_type == "upgrade":
-            self.apply_upgrade(player, product["upgrade_type"])
+        if product["id"] == "max_hp":
+            player.max_hp += 50
+            player.current_hp = player.max_hp
+            player.hp = player.current_hp
+        elif product["id"] == "max_mana":
+            player.max_mana += 50
+            player.current_mana = player.max_mana
+            player.mana = player.current_mana
 
         print(f"Bought {product['name']}")
 
-    def apply_recovery(self, player, recovery_type):
-        if recovery_type == "hp":
-            player.current_hp = player.max_hp
-            player.hp = player.current_hp
-        elif recovery_type == "mana":
-            player.current_mana = player.max_mana
-            player.mana = player.current_mana
-
-    def apply_upgrade(self, player, upgrade_type):
-        if upgrade_type == "max_hp":
-            player.max_hp += SHOP_MAX_HP_INCREASE
-            player.current_hp = player.max_hp
-            player.hp = player.current_hp
-        elif upgrade_type == "max_mana":
-            player.max_mana += SHOP_MAX_MANA_INCREASE
-            player.current_mana = player.max_mana
-            player.mana = player.current_mana
-        elif upgrade_type == "crit_chance":
-            player.crit_chance += SHOP_CRIT_CHANCE_INCREASE
-            player.crit_chance = min(player.crit_chance, SHOP_CRIT_CHANCE_MAX)
-        elif upgrade_type == "crit_damage":
-            player.crit_damage += SHOP_CRIT_DAMAGE_INCREASE
-            player.crit_damage = min(player.crit_damage, SHOP_CRIT_DAMAGE_MAX)
-        elif upgrade_type == "attack_potion":
-            player.bonus_attack_percent += SHOP_ATTACK_POTION_INCREASE
-            player.bonus_attack_percent = min(player.bonus_attack_percent, SHOP_ATTACK_POTION_MAX)
-
     def draw_shop_area(self, screen, camera=None):
-        draw_rect = self.rect
-        if camera:
-            draw_rect = camera.apply_rect(self.rect)
-
-        cabinet = draw_rect
-        counter = pygame.Rect(draw_rect.x - 12, draw_rect.y + draw_rect.height - 24, draw_rect.width + 24, 24)
-
-        pygame.draw.rect(screen, (105, 70, 50), cabinet)
-        pygame.draw.rect(screen, (170, 120, 70), counter)
-        pygame.draw.rect(screen, (245, 220, 140), cabinet, 3)
-
-        title_font = pygame.font.Font(None, 30)
-        title = title_font.render("SHOP", True, (255, 245, 180))
-        screen.blit(title, title.get_rect(center=cabinet.center))
-
-        slot_width = 118
-        slot_height = 34
-        gap = 10
-        total_width = len(self.current_products) * slot_width + (len(self.current_products) - 1) * gap
-        start_x = self.rect.centerx - total_width // 2
-        slot_y = self.rect.y - slot_height - 18
+        font = pygame.font.Font(None, 24)
+        price_font = pygame.font.Font(None, 22)
 
         for index, product in enumerate(self.current_products):
-            slot_rect = pygame.Rect(start_x + index * (slot_width + gap), slot_y, slot_width, slot_height)
-            if camera:
-                slot_rect = camera.apply_rect(slot_rect)
+            center_x, platform_y = self.get_product_positions()[index]
+            platform_rect = pygame.Rect(0, 0, 130, 18)
+            platform_rect.midtop = (center_x, platform_y)
+            potion_center = (center_x, platform_y - 34)
 
-            pygame.draw.rect(screen, (22, 29, 42), slot_rect)
-            pygame.draw.rect(screen, (245, 230, 130), slot_rect, 2)
-            label = self.get_short_product_name(product)
+            draw_platform = camera.apply_rect(platform_rect) if camera else platform_rect
+            draw_potion_center = camera.apply_pos(potion_center) if camera else potion_center
+            draw_name_pos = camera.apply_pos((center_x, platform_y - 76)) if camera else (center_x, platform_y - 76)
+            draw_price_pos = camera.apply_pos((center_x, platform_y + 36)) if camera else (center_x, platform_y + 36)
 
-            text = None
-            for font_size in (25, 23, 21, 19):
-                slot_font = pygame.font.Font(None, font_size)
-                candidate = slot_font.render(label, True, (255, 255, 255))
-                if candidate.get_width() <= slot_rect.width - 10:
-                    text = candidate
-                    break
+            pygame.draw.rect(screen, (78, 62, 78), draw_platform)
+            pygame.draw.rect(screen, (220, 205, 130), draw_platform, 2)
 
-            if text is None:
-                slot_font = pygame.font.Font(None, 19)
-                text = slot_font.render(label, True, (255, 255, 255))
+            potion_color = (225, 70, 92) if product["id"] == "max_hp" else (70, 145, 245)
+            pygame.draw.circle(screen, potion_color, draw_potion_center, 14)
+            pygame.draw.circle(screen, (245, 245, 255), draw_potion_center, 14, 2)
+            cap_rect = pygame.Rect(0, 0, 14, 8)
+            cap_rect.midbottom = (draw_potion_center[0], draw_potion_center[1] - 11)
+            pygame.draw.rect(screen, (210, 220, 235), cap_rect)
 
-            screen.blit(text, text.get_rect(center=slot_rect.center))
+            name_text = font.render(product["name"], True, (255, 245, 210))
+            screen.blit(name_text, name_text.get_rect(center=draw_name_pos))
 
-    def get_short_product_name(self, product):
-        short_names = {
-            "Light Weapon": "Light",
-            "Heavy Weapon": "Heavy",
-            "Shooter Weapon": "Shooter",
-            "Shield Weapon": "Shield",
-            "Grapple Weapon": "Grapple",
-            "Time Freeze": "Freeze",
-            "Orbit Blades": "Orbit",
-            "Energy Beam": "Beam",
-            "Soul Anchor": "Anchor",
-            "Heal HP": "Heal",
-            "Restore Mana": "Mana",
-            "Max HP +20": "Max HP",
-            "Max Mana +20": "Max Mana",
-            "Crit Chance +5%": "Crit %",
-            "Crit Damage +25%": "Crit Dmg",
-            "Attack Potion +10%": "Atk Up",
-        }
-        return short_names.get(product["name"], product["name"])
+            price_text = price_font.render("10 coins", True, (255, 225, 90))
+            screen.blit(price_text, price_text.get_rect(center=draw_price_pos))
+
+    def get_nearby_prompt(self, player):
+        index = self.nearby_product_index(player)
+        if index is None:
+            return "Press E to buy"
+
+        product = self.current_products[index]
+        if product["id"] == "max_hp":
+            return "Press E to buy Max HP (+50) - 10 coins"
+        return "Press E to buy Max Mana (+50) - 10 coins"
 
     def draw_shop_menu(self, screen, player):
-        panel = pygame.Rect(300, 130, SCREEN_WIDTH - 600, SCREEN_HEIGHT - 260)
+        panel = pygame.Rect(300, 170, SCREEN_WIDTH - 600, SCREEN_HEIGHT - 340)
         pygame.draw.rect(screen, (24, 24, 34), panel)
         pygame.draw.rect(screen, (230, 210, 120), panel, 3)
 
@@ -274,22 +170,15 @@ class Shop:
         small_font = pygame.font.Font(None, 26)
 
         lines = [
-            "SHOP / SHRINE",
+            "SHOP",
             f"Coins: {player.coins}",
-            "",
+            "1. Max HP (+50) - 10 coins",
+            "2. Max Mana (+50) - 10 coins",
+            "ESC. Close Shop",
         ]
-
-        for index, product in enumerate(self.current_products):
-            lines.append(f"{index + 1}. {product['name']} - {product['cost']} coins")
-
-        lines.extend(["", "ESC. Close Shop"])
 
         y = panel.y + 30
         for index, line in enumerate(lines):
-            if index == 0:
-                text = font.render(line, True, (255, 245, 180))
-            else:
-                text = small_font.render(line, True, (235, 235, 235))
-
+            text = font.render(line, True, (255, 245, 180)) if index == 0 else small_font.render(line, True, (235, 235, 235))
             screen.blit(text, (panel.x + 34, y))
-            y += 32
+            y += 34

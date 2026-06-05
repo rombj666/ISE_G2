@@ -13,10 +13,6 @@ from settings import (
     SHIELD_THROW_SIZE,
     SHIELD_THROW_SPEED,
     SHOOTER_BULLET_FRAME_COUNT,
-    SHOOTER_BULLET_FRAME_HEIGHT,
-    SHOOTER_BULLET_FRAME_WIDTH,
-    SHOOTER_BULLET_HIT_FRAME_HEIGHT,
-    SHOOTER_BULLET_HIT_FRAME_WIDTH,
     SHOOTER_BULLET_HIT_PATH,
     SHOOTER_BULLET_PATH,
 )
@@ -25,6 +21,8 @@ from settings import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SHOOTER_BULLET_FRAMES = None
 SHOOTER_BULLET_HIT_FRAMES = None
+SHOOTER_BULLET_SCALE = 0.35
+SHOOTER_BULLET_HIT_SCALE = 0.45
 
 
 def resolve_asset_path(path):
@@ -34,7 +32,57 @@ def resolve_asset_path(path):
     return PROJECT_ROOT / asset_path
 
 
-def load_projectile_sheet(path, frame_count, frame_width, frame_height):
+def color_distance(color, sample):
+    return abs(color.r - sample.r) + abs(color.g - sample.g) + abs(color.b - sample.b)
+
+
+def repair_projectile_background(surface):
+    samples = [
+        surface.get_at((0, 0)),
+        surface.get_at((surface.get_width() - 1, 0)),
+        surface.get_at((0, surface.get_height() - 1)),
+        surface.get_at((surface.get_width() - 1, surface.get_height() - 1)),
+    ]
+    if any(sample.a < 255 for sample in samples):
+        return surface
+
+    repaired = surface.copy()
+    removed_pixels = 0
+    for y in range(repaired.get_height()):
+        for x in range(repaired.get_width()):
+            color = repaired.get_at((x, y))
+            spread = max(color.r, color.g, color.b) - min(color.r, color.g, color.b)
+            matches_corner = any(color_distance(color, sample) <= 42 for sample in samples)
+            near_white = color.r >= 220 and color.g >= 220 and color.b >= 220 and spread <= 35
+            flat_gray = spread <= 16 and 35 <= color.r <= 225 and 35 <= color.g <= 225 and 35 <= color.b <= 225
+            if color.a == 255 and (matches_corner or near_white or flat_gray):
+                repaired.set_at((x, y), (color.r, color.g, color.b, 0))
+                removed_pixels += 1
+    if removed_pixels == 0 and samples[0].a == 255:
+        print("WARNING: shooter bullet image is not transparent and must be regenerated/exported as transparent PNG")
+    return repaired
+
+
+def crop_visible(surface):
+    bounds = surface.get_bounding_rect(min_alpha=1)
+    if bounds.width <= 0 or bounds.height <= 0:
+        return surface
+    cropped = pygame.Surface(bounds.size, pygame.SRCALPHA)
+    cropped.blit(surface, (0, 0), bounds)
+    return cropped
+
+
+def scale_projectile_frame(surface, scale):
+    if scale == 1:
+        return surface
+    size = (
+        max(1, round(surface.get_width() * scale)),
+        max(1, round(surface.get_height() * scale)),
+    )
+    return pygame.transform.smoothscale(surface, size).convert_alpha()
+
+
+def load_projectile_sheet(path, frame_count, scale=1.0):
     resolved_path = resolve_asset_path(path)
     print("Projectile sheet path:", resolved_path)
     print("Projectile sheet exists:", resolved_path.exists())
@@ -45,12 +93,19 @@ def load_projectile_sheet(path, frame_count, frame_width, frame_height):
 
     sheet = pygame.image.load(str(resolved_path)).convert_alpha()
     print("Projectile sheet size:", sheet.get_size())
+    frame_width = sheet.get_width() // frame_count
+    frame_height = sheet.get_height()
+    if sheet.get_width() % frame_count != 0:
+        print("Projectile sheet width not evenly divisible by frame count:", resolved_path, sheet.get_size())
 
     frames = []
     for index in range(frame_count):
         source_rect = pygame.Rect(index * frame_width, 0, frame_width, frame_height)
         frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
         frame.blit(sheet, (0, 0), source_rect)
+        frame = repair_projectile_background(frame)
+        frame = crop_visible(frame)
+        frame = scale_projectile_frame(frame, scale)
         frames.append(frame)
 
     print("Projectile loaded frame count:", len(frames))
@@ -64,8 +119,7 @@ def get_shooter_bullet_frames():
         SHOOTER_BULLET_FRAMES = load_projectile_sheet(
             SHOOTER_BULLET_PATH,
             SHOOTER_BULLET_FRAME_COUNT,
-            SHOOTER_BULLET_FRAME_WIDTH,
-            SHOOTER_BULLET_FRAME_HEIGHT,
+            SHOOTER_BULLET_SCALE,
         )
     return SHOOTER_BULLET_FRAMES
 
@@ -76,8 +130,7 @@ def get_shooter_bullet_hit_frames():
         SHOOTER_BULLET_HIT_FRAMES = load_projectile_sheet(
             SHOOTER_BULLET_HIT_PATH,
             SHOOTER_BULLET_FRAME_COUNT,
-            SHOOTER_BULLET_HIT_FRAME_WIDTH,
-            SHOOTER_BULLET_HIT_FRAME_HEIGHT,
+            SHOOTER_BULLET_HIT_SCALE,
         )
     return SHOOTER_BULLET_HIT_FRAMES
 

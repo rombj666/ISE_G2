@@ -201,6 +201,8 @@ class Player:
         self.friction = 0.85
         self.max_speed = PLAYER_SPEED
         self.on_ground = True
+        self.drop_through_timer = 0
+        self.previous_bottom = self.rect.bottom
 
         self.hp = PLAYER_MAX_HP
         self.current_hp = PLAYER_MAX_HP
@@ -569,6 +571,7 @@ class Player:
         moving_left = keys[pygame.K_a] or keys[pygame.K_LEFT]
         moving_right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
         jump_key_pressed = keys[pygame.K_SPACE] or keys[pygame.K_w]
+        drop_pressed = keys[pygame.K_s] or keys[pygame.K_DOWN]
 
         if self.on_ground:
             self.jump_count = 0
@@ -593,7 +596,12 @@ class Player:
         if self.vel_x != 0:
             self.last_vel_x = self.vel_x
 
-        if jump_key_pressed and not self.jump_pressed:
+        if jump_key_pressed and drop_pressed and self.on_ground and not self.jump_pressed:
+            self.drop_through_timer = 0.25
+            self.rect.y += 4
+            self.on_ground = False
+            self.jump_pressed = True
+        elif jump_key_pressed and not self.jump_pressed:
             if self.jump_count < self.max_jumps:
                 self.vel_y = PLAYER_JUMP_SPEED
                 self.jump_count += 1
@@ -1029,6 +1037,10 @@ class Player:
             self.vel_y = 0
 
     def update(self, dt, platforms, keys):
+        self.previous_bottom = self.rect.bottom
+        if self.drop_through_timer > 0:
+            self.drop_through_timer -= dt
+
         self.update_timers(dt)
         self.update_attack_animation(dt)
 
@@ -1424,6 +1436,8 @@ class Player:
         self.rect.x += move_amount
 
         for platform in platforms:
+            if self._is_one_way_platform(platform):
+                continue
             if self.rect.colliderect(platform):
                 if move_amount > 0:
                     self.rect.right = platform.left
@@ -1437,12 +1451,19 @@ class Player:
         self.on_ground = False
 
         for platform in platforms:
-            if self.rect.colliderect(platform) or (
-                self.vel_y >= 0 and
-                abs(self.rect.bottom - platform.top) <= 3 and
-                self.rect.right > platform.left + 5 and
-                self.rect.left < platform.right - 5
-            ):
+            if self._is_one_way_platform(platform):
+                if self.drop_through_timer > 0:
+                    continue
+                if not self._should_land_on_one_way_platform(platform):
+                    continue
+
+                self.rect.bottom = platform.top
+                self.vel_y = 0
+                self.on_ground = True
+                self.jump_count = 0
+                break
+
+            if self.rect.colliderect(platform):
                 if self.vel_y >= 0:
                     self.rect.bottom = platform.top
                     self.vel_y = 0
@@ -1453,6 +1474,18 @@ class Player:
                     self.rect.top = platform.bottom
                     self.vel_y = 0
                     break
+
+    def _is_one_way_platform(self, platform):
+        return platform.height <= 24
+
+    def _should_land_on_one_way_platform(self, platform):
+        return (
+            self.vel_y >= 0
+            and self.previous_bottom <= platform.top + 3
+            and self.rect.bottom >= platform.top
+            and self.rect.right > platform.left + 5
+            and self.rect.left < platform.right - 5
+        )
 
     def draw(self, screen, camera=None):
         if self.draw_attack_animation(screen, camera):

@@ -1,4 +1,5 @@
 import pygame
+from settings import DEBUG_DRAW_HITBOXES
 
 
 class Room:
@@ -29,8 +30,9 @@ class Room:
             pygame.draw.rect(screen, (120, 120, 130), platform)
 
         if self.exit_rect is not None:
-            pygame.draw.rect(screen, (60, 220, 100), self.exit_rect)
-            pygame.draw.rect(screen, (220, 255, 220), self.exit_rect, 2)
+            if DEBUG_DRAW_HITBOXES:
+                pygame.draw.rect(screen, (60, 220, 100), self.exit_rect)
+                pygame.draw.rect(screen, (220, 255, 220), self.exit_rect, 2)
 
             font = pygame.font.Font(None, 28)
             text = font.render("Exit", True, (20, 40, 20))

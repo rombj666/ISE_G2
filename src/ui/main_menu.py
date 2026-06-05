@@ -1,8 +1,47 @@
 import math
+from pathlib import Path
 
 import pygame
 
 from settings import SCREEN_HEIGHT, SCREEN_WIDTH, TITLE
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+UNARMED_IDLE_PATH = PROJECT_ROOT / "assets" / "animations" / "idle_withoutweapon.png"
+UNARMED_IDLE_FRAME_COUNT = 4
+UNARMED_IDLE_TARGET_HEIGHT = 132
+
+
+def load_unarmed_idle_frames():
+    print("Main menu unarmed idle path:", UNARMED_IDLE_PATH)
+    if not UNARMED_IDLE_PATH.exists():
+        print("WARNING: Main menu unarmed idle sheet missing:", UNARMED_IDLE_PATH)
+        return []
+
+    try:
+        sheet = pygame.image.load(str(UNARMED_IDLE_PATH)).convert_alpha()
+    except pygame.error as exc:
+        print("WARNING: Failed to load main menu unarmed idle sheet:", UNARMED_IDLE_PATH, exc)
+        return []
+
+    frame_width = sheet.get_width() // UNARMED_IDLE_FRAME_COUNT
+    frame_height = sheet.get_height()
+    if frame_width <= 0 or sheet.get_width() % UNARMED_IDLE_FRAME_COUNT != 0:
+        print("WARNING: Main menu unarmed idle sheet has unexpected size:", UNARMED_IDLE_PATH, sheet.get_size())
+        return []
+
+    frames = []
+    for index in range(UNARMED_IDLE_FRAME_COUNT):
+        source_rect = pygame.Rect(index * frame_width, 0, frame_width, frame_height)
+        frame = pygame.Surface(source_rect.size, pygame.SRCALPHA)
+        frame.blit(sheet, (0, 0), source_rect)
+        scale = UNARMED_IDLE_TARGET_HEIGHT / frame_height
+        scaled_size = (max(1, round(frame_width * scale)), UNARMED_IDLE_TARGET_HEIGHT)
+        frames.append(pygame.transform.smoothscale(frame, scaled_size))
+
+    print("Main menu unarmed idle frame count:", len(frames))
+    print("Main menu unarmed idle frame size:", frames[0].get_size() if frames else None)
+    return frames
 
 
 class MainMenu:
@@ -15,6 +54,10 @@ class MainMenu:
         self.menu_facing = 1
         self.start_rect = pygame.Rect(96, 292, 280, 58)
         self.quit_rect = pygame.Rect(96, 370, 280, 58)
+        self.unarmed_idle_frames = load_unarmed_idle_frames()
+        self.unarmed_idle_index = 0
+        self.unarmed_idle_timer = 0.0
+        self.unarmed_idle_frame_time = 0.24
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -34,6 +77,11 @@ class MainMenu:
         mouse_x, mouse_y = pygame.mouse.get_pos()
         self.orb_x += (mouse_x - self.orb_x) * 0.16
         self.orb_y += (mouse_y - self.orb_y) * 0.16
+        if self.unarmed_idle_frames:
+            self.unarmed_idle_timer += dt
+            if self.unarmed_idle_timer >= self.unarmed_idle_frame_time:
+                self.unarmed_idle_timer = 0.0
+                self.unarmed_idle_index = (self.unarmed_idle_index + 1) % len(self.unarmed_idle_frames)
 
     def draw(self, screen):
         screen.fill((7, 9, 17))
@@ -99,10 +147,17 @@ class MainMenu:
 
     def _draw_character(self, screen):
         breathe = math.sin(self.time * 2.0) * 2
-        character_rect = pygame.Rect(0, 0, 72, 96)
+        character_rect = pygame.Rect(0, 0, 88, UNARMED_IDLE_TARGET_HEIGHT)
         character_rect.midbottom = (910, SCREEN_HEIGHT - 80 + int(breathe))
 
         self.menu_facing = -1 if self.orb_x < character_rect.centerx else 1
+        if self.unarmed_idle_frames:
+            frame = self.unarmed_idle_frames[self.unarmed_idle_index]
+            image = pygame.transform.flip(frame, True, False) if self.menu_facing < 0 else frame
+            draw_rect = image.get_rect(midbottom=character_rect.midbottom)
+            screen.blit(image, draw_rect)
+            return
+
         self._draw_kael_preview(screen, character_rect)
         self._draw_eye_glow(screen, character_rect)
 

@@ -25,6 +25,7 @@ from settings import (
     MAP_8_WIDTH,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
+    DEBUG_DRAW_HITBOXES,
 )
 from src.levels.game_map import GameMap
 from src.levels.tiled_map_loader import load_tiled_map
@@ -1388,7 +1389,8 @@ def draw_map3_train_station_background(screen, camera, game_map):
     pygame.draw.rect(screen, (68, 84, 108), apply_rect(pygame.Rect(gate_x, gate_y, 142, 174)), 4)
     rect(gate_x + 15, gate_y + 25, 112, 129, (14, 30, 46))
     rect(gate_x + 34, gate_y + 43, 74, 92, (18, 90, 79))
-    pygame.draw.rect(screen, green, apply_rect(pygame.Rect(gate_x + 34, gate_y + 43, 74, 92)), 3)
+    if DEBUG_DRAW_HITBOXES:
+        pygame.draw.rect(screen, green, apply_rect(pygame.Rect(gate_x + 34, gate_y + 43, 74, 92)), 3)
     rect(gate_x + 64, gate_y + 54, 14, 70, violet)
     rect(gate_x + 48, gate_y + 38, 46, 4, pale)
     rect(gate_x + 48, gate_y + 132, 46, 4, pale)
@@ -3932,8 +3934,9 @@ class LevelManager:
             draw_rect = door["rect"]
             if camera is not None:
                 draw_rect = camera.apply_rect(door["rect"])
-            pygame.draw.rect(screen, (60, 220, 100), draw_rect)
-            pygame.draw.rect(screen, (220, 255, 220), draw_rect, 2)
+            if DEBUG_DRAW_HITBOXES:
+                pygame.draw.rect(screen, (60, 220, 100), draw_rect)
+                pygame.draw.rect(screen, (220, 255, 220), draw_rect, 2)
             text = font.render(door["label"], True, (20, 40, 20))
             screen.blit(text, text.get_rect(center=draw_rect.center))
 

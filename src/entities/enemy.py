@@ -5,11 +5,10 @@ from PIL import Image, ImageSequence
 
 from settings import (
     DEBUG_ENEMY_HITBOX,
-    ENEMY_ATTACK_COOLDOWN,
-    ENEMY_ATTACK_RANGE,
     ENEMY_ATTACK_TIME,
     ENEMY_MAX_HP,
     ENEMY_RESPAWN_TIME,
+    GRAVITY,
     GRAPPLE_ENEMY_FINAL_STUN_TIME,
     GRAPPLE_PULL_SPEED,
     MELEE_DRAW_OFFSET_Y,
@@ -20,13 +19,19 @@ from settings import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MELEE_ASSET_DIR = PROJECT_ROOT / "assets" / "enemies" / "melee"
+DEBUG_MELEE_AI = False
 MELEE_DETECT_RANGE = 260
 MELEE_ATTACK_RANGE = 65
+MELEE_CHASE_MAX_DISTANCE = 9999
+MELEE_RETURN_TOLERANCE = 20
 MELEE_DAMAGE = 10
 MELEE_SPEED = 1.5
+MELEE_RETURN_SPEED = MELEE_SPEED
+MELEE_JUMP_VELOCITY = -8
+MELEE_STUCK_TIME_TO_JUMP = 0.35
+MELEE_OBSTACLE_JUMP_COOLDOWN = 1.0
 MELEE_ATTACK_COOLDOWN = 1.0
 MELEE_ATTACK_ACTIVE_FRAME = 3
-MELEE_LEASH_RANGE = 220
 MELEE_DRAW_SIZE = (
     round(96 * MELEE_VISUAL_SCALE),
     round(96 * MELEE_VISUAL_SCALE),
@@ -124,6 +129,7 @@ class Enemy:
         self.index = index
         self.debug_ai = debug_ai
         self.mode = mode
+        self.stay_still = mode == "static"
         self.patrol_left = patrol_left
         self.patrol_right = patrol_right
         self.patrol_min_x = x - patrol_left
@@ -154,8 +160,14 @@ class Enemy:
 
         self.stunned_timer = 0
         self.vel_x = 0
+        self.vel_y = 0
         self.velocity_x = 0
+        self.velocity_y = 0
         self.acceleration_x = 0
+        self.on_ground = True
+        self.last_x = self.rect.x
+        self.stuck_timer = 0
+        self.jump_cooldown = 0
         self.being_pulled = False
         self.pull_target_x = None
         self.frozen_timer = 0
@@ -179,7 +191,7 @@ class Enemy:
     def die(self):
         self.current_hp = 0
         self.alive = False
-        self.respawn_timer = ENEMY_RESPAWN_TIME
+        self.respawn_timer = 0
         self.is_attacking = False
         self.being_pulled = False
 
@@ -195,8 +207,14 @@ class Enemy:
 
         self.stunned_timer = 0
         self.vel_x = 0
+        self.vel_y = 0
         self.velocity_x = 0
+        self.velocity_y = 0
         self.acceleration_x = 0
+        self.on_ground = True
+        self.last_x = self.rect.x
+        self.stuck_timer = 0
+        self.jump_cooldown = 0
         self.being_pulled = False
         self.pull_target_x = None
         self.frozen_timer = 0
@@ -248,6 +266,15 @@ class Enemy:
         self.execute_timer = 0
         self.being_pulled = False
         self.pull_target_x = None
+        self.vel_x = 0
+        self.vel_y = 0
+        self.velocity_x = 0
+        self.velocity_y = 0
+        self.acceleration_x = 0
+        self.on_ground = True
+        self.last_x = self.rect.x
+        self.stuck_timer = 0
+        self.jump_cooldown = 0
 
     def stun(self, duration):
         if not self.active:
@@ -302,6 +329,7 @@ class Enemy:
         self.attack_is_active = False
         self.vel_x = 0
         self.velocity_x = 0
+        self.velocity_y = self.vel_y
         self.acceleration_x = 0
         self.state = "attack"
         self.frame_index = 0
@@ -345,11 +373,6 @@ class Enemy:
                 self.is_executable = False
 
         if not self.alive:
-            self.respawn_timer -= dt
-
-            if self.respawn_timer <= 0:
-                self.respawn()
-
             return
 
         if self.attack_cooldown_timer > 0:
@@ -378,6 +401,10 @@ class Enemy:
                 self.lock_static_position()
             return
 
+        platforms = platforms or []
+        self.update_vertical_motion(platforms)
+        self.update_jump_cooldown(dt)
+
         if self.is_attacking:
             self.attack_timer -= dt
             self.attack_hitbox = self.get_attack_hitbox()
@@ -392,54 +419,47 @@ class Enemy:
         if player is None or player.is_dead or self.is_attacking:
             return
 
-        platforms = platforms or []
         horizontal_distance = abs(player.rect.centerx - self.rect.centerx)
         vertical_distance = abs(player.rect.centery - self.rect.centery)
+        distance_to_player = horizontal_distance
+        distance_to_spawn = abs(self.rect.centerx - self.spawn_x)
         player_in_detect_range = (
-            horizontal_distance <= MELEE_DETECT_RANGE
+            distance_to_player <= MELEE_DETECT_RANGE
             and vertical_distance <= self.rect.height * 2
+            and distance_to_spawn <= MELEE_CHASE_MAX_DISTANCE
         )
         player_in_attack_range = (
-            horizontal_distance <= MELEE_ATTACK_RANGE + self.rect.width
+            distance_to_player <= MELEE_ATTACK_RANGE
             and vertical_distance <= self.rect.height
         )
 
+        self.print_ai_debug(player, distance_to_player, distance_to_spawn)
+
         if player_in_detect_range:
-            if self.mode == "static":
-                self.print_static_debug()
-            print("[MELEE AI]")
-            print("melee:", self.rect.center)
-            print("player:", player.rect.center)
-            print("distance_x:", horizontal_distance)
-            print("distance_y:", vertical_distance)
-            print("state:", self.state)
-            print("attack_cooldown:", self.attack_cooldown_timer)
             self.face_player(player)
 
         if player_in_attack_range:
+            self.stop_horizontal_motion()
             if self.attack_cooldown_timer <= 0:
                 self.start_attack(player)
             else:
-                self.vel_x = 0
-                self.velocity_x = 0
-                self.acceleration_x = 0
                 self.state = "idle"
                 self._animate(dt)
             return
 
-        if self.mode == "static":
+        if player_in_detect_range:
+            self.chase_player(player, platforms, dt)
+            return
+
+        if distance_to_spawn > MELEE_RETURN_TOLERANCE:
+            self.return_to_spawn(platforms, dt)
+            return
+
+        if self.stay_still:
             self.lock_static_position()
             self.stop_horizontal_motion()
             self.state = "idle"
             self._animate(dt)
-            return
-
-        if player_in_detect_range and self.can_chase_player(player):
-            self.chase_player(player, platforms, dt)
-            return
-
-        if abs(self.rect.centerx - self.spawn_x) > MELEE_LEASH_RANGE:
-            self.return_to_spawn(platforms, dt)
             return
 
         self.patrol(platforms, dt)
@@ -458,29 +478,29 @@ class Enemy:
         self.velocity_x = 0
         self.acceleration_x = 0
 
-    def print_static_debug(self):
-        print("[STATIC MELEE]")
-        print("spawn:", self.spawn_x, self.spawn_y)
-        print("rect:", self.rect)
-        print("velocity_x:", self.velocity_x)
-        print("state:", self.state)
-        print("mode:", self.mode)
-
-    def can_chase_player(self, player):
-        target_center_x = player.rect.centerx
-        return abs(target_center_x - self.spawn_x) <= MELEE_LEASH_RANGE
-
     def chase_player(self, player, platforms, dt):
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
-        self.try_move_horizontal(direction, platforms, "walk", dt)
+        self.patrol_direction = direction
+        self.try_move_horizontal(direction, platforms, "chase", dt, clamp_to_patrol=False)
 
     def return_to_spawn(self, platforms, dt):
-        direction = 1 if self.spawn_x > self.rect.centerx else -1
-        if abs(self.rect.centerx - self.spawn_x) <= MELEE_SPEED:
-            self.vel_x = 0
-            self.state = "idle"
+        if abs(self.rect.centerx - self.spawn_x) <= MELEE_RETURN_TOLERANCE:
+            self.stop_horizontal_motion()
+            self.rect.centerx = self.spawn_x
+            self.state = "idle" if self.stay_still else "patrol"
+            self._animate(dt)
             return
-        self.try_move_horizontal(direction, platforms, "walk", dt)
+
+        direction = 1 if self.spawn_x > self.rect.centerx else -1
+        self.patrol_direction = direction
+        self.try_move_horizontal(
+            direction,
+            platforms,
+            "return",
+            dt,
+            clamp_to_patrol=False,
+            speed=MELEE_RETURN_SPEED,
+        )
 
     def patrol(self, platforms, dt):
         if self.rect.centerx <= self.patrol_min_x:
@@ -488,7 +508,7 @@ class Enemy:
         elif self.rect.centerx >= self.patrol_max_x:
             self.patrol_direction = -1
 
-        moved = self.try_move_horizontal(self.patrol_direction, platforms, "walk", dt)
+        moved = self.try_move_horizontal(self.patrol_direction, platforms, "patrol", dt)
         if not moved:
             self.patrol_direction *= -1
         if self.debug_ai:
@@ -501,29 +521,45 @@ class Enemy:
                 self.patrol_direction,
             )
 
-    def try_move_horizontal(self, direction, platforms, state, dt):
+    def try_move_horizontal(
+        self,
+        direction,
+        platforms,
+        state,
+        dt,
+        clamp_to_patrol=True,
+        speed=MELEE_SPEED,
+    ):
         self.facing = direction
-        self.vel_x = direction * MELEE_SPEED
+        self.vel_x = direction * speed
         self.velocity_x = self.vel_x
         next_rect = self.rect.copy()
         next_rect.x = round(self.rect.x + self.vel_x)
 
-        if next_rect.centerx < self.patrol_min_x:
-            next_rect.centerx = round(self.patrol_min_x)
-            self.patrol_direction = 1
-        elif next_rect.centerx > self.patrol_max_x:
-            next_rect.centerx = round(self.patrol_max_x)
-            self.patrol_direction = -1
+        if clamp_to_patrol:
+            if next_rect.centerx < self.patrol_min_x:
+                next_rect.centerx = round(self.patrol_min_x)
+                self.patrol_direction = 1
+            elif next_rect.centerx > self.patrol_max_x:
+                next_rect.centerx = round(self.patrol_max_x)
+                self.patrol_direction = -1
 
-        if not self.has_ground_ahead(next_rect, platforms) or self.hits_wall(next_rect, platforms):
+        wall_ahead = self.hits_wall(next_rect, platforms)
+        ground_ahead = self.has_ground_ahead(next_rect, platforms)
+        if wall_ahead:
+            self.try_obstacle_jump()
+
+        if not ground_ahead or wall_ahead:
             self.vel_x = 0
             self.velocity_x = 0
-            self.state = "idle"
+            self.state = state
+            self._animate(dt)
             return False
 
         self.rect.x = next_rect.x
         self.state = state
         self._animate(dt)
+        self.update_stuck_detection(dt)
         return True
 
     def has_ground_ahead(self, next_rect, platforms):
@@ -537,6 +573,78 @@ class Enemy:
             if wall_probe.colliderect(platform) and platform.top < self.rect.bottom - 8:
                 return True
         return False
+
+    def update_vertical_motion(self, platforms):
+        if not platforms:
+            self.on_ground = True
+            self.vel_y = 0
+            self.velocity_y = 0
+            return
+
+        if not self.on_ground or self.vel_y != 0:
+            self.vel_y += GRAVITY
+
+        self.rect.y += round(self.vel_y)
+        self.on_ground = False
+
+        for platform in platforms:
+            if not self.rect.colliderect(platform):
+                continue
+
+            if self.vel_y >= 0:
+                self.rect.bottom = platform.top
+                self.vel_y = 0
+                self.on_ground = True
+            elif self.vel_y < 0:
+                self.rect.top = platform.bottom
+                self.vel_y = 0
+
+        if not self.on_ground:
+            ground_probe = pygame.Rect(self.rect.x, self.rect.bottom, self.rect.width, 4)
+            self.on_ground = any(ground_probe.colliderect(platform) for platform in platforms)
+
+        self.velocity_y = self.vel_y
+
+    def update_jump_cooldown(self, dt):
+        if self.jump_cooldown > 0:
+            self.jump_cooldown -= dt
+
+    def update_stuck_detection(self, dt):
+        if abs(self.rect.x - self.last_x) < 1 and abs(self.velocity_x) > 0:
+            self.stuck_timer += dt
+        else:
+            self.stuck_timer = 0
+
+        self.last_x = self.rect.x
+
+        if self.stuck_timer >= MELEE_STUCK_TIME_TO_JUMP:
+            self.try_obstacle_jump()
+
+    def try_obstacle_jump(self):
+        if not self.on_ground or self.jump_cooldown > 0:
+            return False
+
+        self.vel_y = MELEE_JUMP_VELOCITY
+        self.velocity_y = self.vel_y
+        self.on_ground = False
+        self.stuck_timer = 0
+        self.jump_cooldown = MELEE_OBSTACLE_JUMP_COOLDOWN
+        print("[MELEE JUMP UNSTUCK]", self.rect, "state:", self.state)
+        return True
+
+    def print_ai_debug(self, player, distance_to_player, distance_to_spawn):
+        if not (DEBUG_MELEE_AI or self.debug_ai):
+            return
+
+        print("[MELEE AI]")
+        print("state:", self.state)
+        print("mode:", self.mode)
+        print("enemy x:", self.rect.centerx)
+        print("spawn x:", self.spawn_x)
+        print("player x:", player.rect.centerx)
+        print("distance_to_player:", distance_to_player)
+        print("distance_to_spawn:", distance_to_spawn)
+        print("velocity_x:", self.velocity_x)
 
     def update_pull(self):
         if self.pull_target_x is None:
@@ -558,7 +666,11 @@ class Enemy:
 
     def _current_frames(self):
         direction = "east" if self.facing > 0 else "west"
-        frames = self.animations.get(self.state, {}).get(direction, [])
+        animation_state = self.state
+        if animation_state in ("patrol", "chase", "return"):
+            animation_state = "walk"
+
+        frames = self.animations.get(animation_state, {}).get(direction, [])
         if not frames and self.state != "idle":
             frames = self.animations.get("idle", {}).get(direction, [])
         return frames
