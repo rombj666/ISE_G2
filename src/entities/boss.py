@@ -17,7 +17,9 @@ from settings import (
     BOSS_ROOM_MIN_X,
     BOSS_ROOM_MIN_Y,
     BOSS_ROOM_WIDTH,
-    HAND_SLAM_WARNING_ANIM_SPEED,
+    HAND_SLAM_WARNING_FRAME_TIME,
+    HAND_SLAM_WARNING_OFFSET_X,
+    HAND_SLAM_WARNING_OFFSET_Y,
     HAND_SLAM_WARNING_SCALE,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
@@ -39,7 +41,7 @@ BOSS_ASSETS = {
     "lunar_shard_warning": BOSS_ASSET_DIR / "lunar_shard_warning.png",
     "lunar_shard_fall": BOSS_ASSET_DIR / "lunar_shard_fall.png",
     "beam_ready": BOSS_ASSET_DIR / "boss_beam_ready_clean.png",
-    "beam_attack": BOSS_ASSET_DIR / "boss_beam_attack_clean.png",
+    "beam_attack": BOSS_ASSET_DIR / "boss_beam_attack.png",
     "moon_orb_spawn": BOSS_ASSET_DIR / "moon_orb_spawn.png",
     "moon_orb_fly": BOSS_ASSET_DIR / "moon_orb_fly.png",
 }
@@ -81,8 +83,9 @@ BOSS_BEAM_WIDTH = 96
 BOSS_BEAM_GLOW_WIDTH = 190
 BOSS_BEAM_TOP_Y = 80
 BOSS_BEAM_FLOOR_Y = 650
-BOSS_BEAM_READY_DURATION = 0.45
-BOSS_BEAM_FIRE_DURATION = 1.35
+BOSS_BEAM_READY_DURATION = 0.5
+BOSS_BEAM_FIRE_DURATION = 1.5
+BOSS_BEAM_SOURCE_HOLD_UNTIL_BEAM_END = True
 BOSS_BEAM_COLOR_INNER = (230, 255, 255, 235)
 BOSS_BEAM_COLOR_MID = (105, 235, 255, 175)
 BOSS_BEAM_COLOR_OUTER = (50, 145, 255, 65)
@@ -104,6 +107,14 @@ MANUAL_BOSS_PROJECTILE_RECTS = None
 MANUAL_BOSS_GROUND_RECTS = None
 MANUAL_BOSS_BEAM_RECTS = None
 
+# Edit HAND_SLAM_WARNING_RECTS to adjust frame crop.
+# Format: (x, y, width, height)
+HAND_SLAM_WARNING_RECTS = [
+    (0, 120, 700, 450),
+    (700, 120, 700, 450),
+    (1400, 120, 700, 450),
+    (2100, 120, 700, 450),
+]
 # Adjust these rects manually if frame position/crop is wrong.
 # Format: (x, y, width, height)
 BOSS_EFFECT_FRAME_COUNTS = {
@@ -299,6 +310,8 @@ class PaleCoreBoss:
         self.core_beam_fire_timer = 0
         self.core_beam_facing = 1
         self.core_beam_active = False
+        self.beam_state = "finished"
+        self.last_beam_state_debug = None
         self.player_hit_cooldown = 0
         self.load_assets()
         self.print_startup_debug()
@@ -309,7 +322,7 @@ class PaleCoreBoss:
         hand_path = BOSS_ASSETS["hand"]
         hand_slam_path = BOSS_ASSETS["hand_slam_down"]
         beam_ready_path = BOSS_ASSETS["beam_ready"]
-        beam_attack_path = BOSS_ASSETS["beam_attack"]
+        beam_attack_path = self.get_optional_beam_attack_path()
 
         self.boss_room_background = self.load_boss_single_image("arena_background", self.boss_room_background_rect.size)
         if self.boss_room_background is not None:
@@ -373,12 +386,21 @@ class PaleCoreBoss:
             scale=BOSS_BEAM_ATTACK_SCALE,
             debug_name="boss_beam_attack",
         )
-        self.boss_slam_warning_frames = self.load_fixed_frame_sheet(
+        self.boss_slam_warning_frames = self.load_manual_rect_sheet(
             BOSS_ASSETS["hand_slam_warning"],
-            BOSS_EFFECT_FRAME_COUNTS["slam_warning"],
+            HAND_SLAM_WARNING_RECTS,
             scale=HAND_SLAM_WARNING_SCALE,
-            debug_name="boss_slam_warning_frames",
+            debug_name="hand_slam_warning",
         )
+        print("[HAND SLAM WARNING RECTS]", HAND_SLAM_WARNING_RECTS)
+        print(
+            "[HAND SLAM WARNING FRAMES]",
+            len(self.boss_slam_warning_frames),
+            self.boss_slam_warning_frames[0].get_size() if self.boss_slam_warning_frames else None,
+        )
+        print("[BOSS BEAM SOURCE HELD]", BOSS_BEAM_SOURCE_HOLD_UNTIL_BEAM_END)
+        print("[BOSS BEAM READY FRAMES]", len(self.boss_beam_ready_frames))
+        print("[BOSS BEAM ATTACK OPTIONAL]", len(self.boss_beam_attack_frames))
         self.animations["hand_slam_warning"] = self.boss_slam_warning_frames
         self.boss_hit_effect_frames = self.load_fixed_frame_sheet(
             BOSS_ASSETS["hit_effect"],
@@ -618,9 +640,11 @@ class PaleCoreBoss:
             self.draw_clean_debug(frames, DEBUG_OUTPUT_DIR / f"{debug_name}_clean_debug.png")
         return frames
 
-    def load_manual_rect_sheet(self, path, rects, scale=1.0, debug_name=None):
-        print("Boss manual rect sheet file path:", path)
-        print("Boss manual rect frame count:", len(rects))
+    def load_manual_rect_sheet(self, path, rects, scale=1.0, debug_name=None, write_debug=None):
+        if debug_name == "hand_slam_warning":
+            print("Hand slam warning manual rect sheet file path:", path)
+        else:
+            print("Boss manual rect sheet file path:", path)
         if not path.exists():
             print("[BOSS ASSET MISSING]", debug_name or path.stem, path)
             return []
@@ -632,11 +656,16 @@ class PaleCoreBoss:
 
         frames = []
         source_rects = []
-        for rect in rects:
+        for index, rect in enumerate(rects):
             x, y, width, height = rect
+            if x < 0 or y < 0 or width <= 0 or height <= 0:
+                raise ValueError(f"Invalid boss manual source rect: {rect}")
+            if x + width > sheet.get_width() or y + height > sheet.get_height():
+                raise ValueError(f"Boss manual source rect outside {path.name}: {rect}")
             source_rect = pygame.Rect(x, y, width, height)
             frame = pygame.Surface((width, height), pygame.SRCALPHA)
             frame.blit(sheet, (0, 0), source_rect)
+            frame = self.force_boss_transparency(frame, f"{debug_name or path.stem}_{index}")
             if scale != 1.0:
                 frame = pygame.transform.smoothscale(
                     frame,
@@ -647,7 +676,10 @@ class PaleCoreBoss:
 
         print("[MANUAL RECT LOAD]", path, "frames:", len(frames), "rects:", rects)
         print("[LOAD]", path, "frames:", len(frames), "frame_size:", frames[0].get_size() if frames else None)
-        if debug_name and BOSS_WRITE_DEBUG_PREVIEWS:
+        if debug_name == "hand_slam_warning":
+            print("Hand slam warning manual rect frame count:", len(frames))
+        should_write_debug = BOSS_WRITE_DEBUG_PREVIEWS if write_debug is None else write_debug
+        if debug_name and should_write_debug:
             self.draw_source_rect_debug(sheet, source_rects, DEBUG_OUTPUT_DIR / f"{debug_name}_source_rects.png")
             self.draw_clean_debug(frames, DEBUG_OUTPUT_DIR / f"{debug_name}_clean_debug.png")
         return frames
@@ -704,6 +736,9 @@ class PaleCoreBoss:
     def draw_source_rect_debug(self, sheet, source_rects, output_path):
         DEBUG_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         debug_surface = sheet.copy()
+        if not pygame.font.get_init():
+            pygame.font.init()
+        label_font = pygame.font.Font(None, 42)
         colors = [
             (255, 80, 80),
             (80, 255, 120),
@@ -713,17 +748,24 @@ class PaleCoreBoss:
             (255, 150, 60),
         ]
         for index, rect in enumerate(source_rects):
-            pygame.draw.rect(debug_surface, colors[index % len(colors)], rect, 4)
+            color = colors[index % len(colors)]
+            pygame.draw.rect(debug_surface, color, rect, 4)
+            label = label_font.render(str(index + 1), True, (0, 0, 0))
+            label_background = label.get_rect(topleft=(rect.x + 10, rect.y + 10)).inflate(14, 10)
+            pygame.draw.rect(debug_surface, color, label_background)
+            debug_surface.blit(label, label.get_rect(center=label_background.center))
         pygame.image.save(debug_surface, output_path)
 
     def draw_clean_debug(self, frames, output_path):
         DEBUG_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         if not frames:
             return
-        frame_width, frame_height = frames[0].get_size()
+        frame_width = max(frame.get_width() for frame in frames)
+        frame_height = max(frame.get_height() for frame in frames)
         debug_surface = pygame.Surface((frame_width * len(frames), frame_height), pygame.SRCALPHA)
         for index, frame in enumerate(frames):
-            debug_surface.blit(frame, (index * frame_width, 0))
+            frame_rect = frame.get_rect(center=(index * frame_width + frame_width // 2, frame_height // 2))
+            debug_surface.blit(frame, frame_rect)
             pygame.draw.rect(
                 debug_surface,
                 (255, 255, 255),
@@ -731,6 +773,15 @@ class PaleCoreBoss:
                 1,
             )
         pygame.image.save(debug_surface, output_path)
+
+    def get_optional_beam_attack_path(self):
+        for path in (
+            BOSS_ASSET_DIR / "boss_beam_attack_clean.png",
+            BOSS_ASSET_DIR / "boss_beam_attack.png",
+        ):
+            if path.exists():
+                return path
+        return BOSS_ASSETS["beam_attack"]
 
     def print_startup_debug(self):
         print("PaleCoreBoss asset folder:", BOSS_ASSET_DIR)
@@ -809,6 +860,8 @@ class PaleCoreBoss:
         self.core_beam_fire_timer = 0
         self.core_beam_facing = 1
         self.core_beam_active = False
+        self.beam_state = "finished"
+        self.last_beam_state_debug = None
         self.player_hit_cooldown = 0
 
     def reset_hands(self):
@@ -917,6 +970,7 @@ class PaleCoreBoss:
         self.core_beam_active = False
         self.core_beam_ready_timer = 0
         self.core_beam_fire_timer = 0
+        self.set_beam_state("finished")
 
     def choose_attack_skills(self):
         if self.phase == 1:
@@ -979,6 +1033,7 @@ class PaleCoreBoss:
         self.core_beam_ready_timer = BOSS_BEAM_READY_DURATION
         self.core_beam_fire_timer = BOSS_BEAM_FIRE_DURATION
         self.core_beam_active = False
+        self.set_beam_state("ready")
 
     def finish_attack(self):
         self.state = "idle"
@@ -988,8 +1043,7 @@ class PaleCoreBoss:
         self.core_beam_active = False
         self.core_beam_ready_timer = 0
         self.core_beam_fire_timer = 0
-        self.core_beam_ready_timer = 0
-        self.core_beam_fire_timer = 0
+        self.set_beam_state("finished")
         self.current_attack_duration = 0
         self.state_timer = 0.5 if self.phase == 2 else 1.0
 
@@ -1055,7 +1109,10 @@ class PaleCoreBoss:
         hand.slam_rect = image.get_rect(midtop=(target_x, slam_spawn_y)) if image is not None else pygame.Rect(target_x - 160, slam_spawn_y, 320, 260)
         hand.slam_target_x = target_x
         hand.slam_target_y = target_y
-        hand.slam_warning_pos = (target_x, target_y)
+        hand.slam_warning_pos = (
+            target_x + HAND_SLAM_WARNING_OFFSET_X,
+            target_y + HAND_SLAM_WARNING_OFFSET_Y,
+        )
         hand.slam_timer = HAND_SLAM_WARNING_TIME
         hand.slam_warning_elapsed = 0
         hand.slam_phase = "warning"
@@ -1140,12 +1197,20 @@ class PaleCoreBoss:
         if self.core_beam_ready_timer > 0:
             self.core_beam_ready_timer = max(0, self.core_beam_ready_timer - dt)
             self.core_beam_active = False
+            self.set_beam_state("ready")
             return
 
         self.core_beam_fire_timer = max(0, self.core_beam_fire_timer - dt)
         self.core_beam_active = self.core_beam_fire_timer > 0
+        self.set_beam_state("firing" if self.core_beam_active else "finished")
         if self.core_beam_active and self.core_beam_rect.colliderect(player.rect):
             self.damage_player(player, 18)
+
+    def set_beam_state(self, state):
+        self.beam_state = state
+        if state != self.last_beam_state_debug:
+            print("[BOSS BEAM STATE]", self.beam_state)
+            self.last_beam_state_debug = state
 
     def get_hands(self):
         return [self.left_hand, self.right_hand]
@@ -1474,7 +1539,7 @@ class PaleCoreBoss:
                 warning_frame = self.get_looped_frame(
                     self.boss_slam_warning_frames,
                     hand.slam_warning_elapsed,
-                    HAND_SLAM_WARNING_ANIM_SPEED,
+                    HAND_SLAM_WARNING_FRAME_TIME,
                 )
                 self.draw_anchored_frame(
                     screen,
@@ -1513,19 +1578,27 @@ class PaleCoreBoss:
         if self.core_beam_rect is None:
             return
 
-        if self.core_beam_ready_timer > 0:
+        if self.beam_state == "ready" and self.core_beam_ready_timer > 0:
             elapsed = BOSS_BEAM_READY_DURATION - self.core_beam_ready_timer
             frame = self.get_timed_frame(self.boss_beam_ready_frames, elapsed, BOSS_BEAM_READY_DURATION)
             self.draw_anchored_frame(screen, frame, self.core_beam_origin, camera, anchor=BOSS_BEAM_SOURCE_ANCHOR)
             return
 
-        if self.core_beam_fire_timer <= 0:
+        if self.beam_state != "firing" or self.core_beam_fire_timer <= 0:
             return
 
         fire_elapsed = BOSS_BEAM_FIRE_DURATION - self.core_beam_fire_timer
-        attack_frame = self.get_timed_frame(self.boss_beam_attack_frames, fire_elapsed, BOSS_BEAM_FIRE_DURATION)
+        source_frames = self.boss_beam_attack_frames or self.boss_beam_ready_frames
+        source_frame = self.get_looped_frame(source_frames, fire_elapsed, BOSS_CORE_FRAME_DURATION)
         self.draw_boss_beam_column(screen, self.core_beam_draw_rect, camera)
-        self.draw_anchored_frame(screen, attack_frame, self.core_beam_origin, camera, anchor=BOSS_BEAM_SOURCE_ANCHOR)
+        if BOSS_BEAM_SOURCE_HOLD_UNTIL_BEAM_END:
+            self.draw_anchored_frame(
+                screen,
+                source_frame,
+                self.core_beam_origin,
+                camera,
+                anchor=BOSS_BEAM_SOURCE_ANCHOR,
+            )
 
     def get_timed_frame(self, frames, elapsed, duration):
         if not frames:

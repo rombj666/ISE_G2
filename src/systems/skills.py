@@ -40,10 +40,6 @@ DEBUG_OUTPUT_DIR = PROJECT_ROOT / "assets" / "processed" / "debug"
 SKILL_WRITE_DEBUG_PREVIEWS = False
 SKILL_FRAME_CACHE = {}
 
-PLAYER_SKILL_FRAME_COUNTS = {
-    "energy_beam_attack": 6,
-}
-
 TIME_FREEZE_ACTION_SIZE = (300, 210)
 
 ORBIT_READY_SIZE = (120, 120)
@@ -76,6 +72,20 @@ MANUAL_ORBIT_BLADE_RECTS = {
 MANUAL_ENERGY_BEAM_RECTS = {
     "ready": None,
 }
+
+# PLAYER ENERGY BEAM ATTACK MANUAL RECTS
+# Format: (x, y, width, height)
+# Edit these numbers to adjust each frame crop box.
+# Use assets/processed/debug/energy_beam_attack_source_rects.png as visual guide.
+ENERGY_BEAM_ATTACK_RECTS = [
+    (0, 0, 282, 724),
+    (282, 0, 242, 724),
+    (554, 0, 282, 724),
+    (856, 0, 462, 724),
+    (1348, 0, 472, 724),
+    (1820, 0, 350, 724),
+]
+ENERGY_BEAM_ATTACK_SOURCE_PATH = "assets/skills/beam_attack/energy_beam_attack.png"
 
 MANUAL_SOUL_ANCHOR_RECTS = {
     "ready": None,
@@ -180,8 +190,9 @@ SKILL_ASSETS = {
         "path": ENERGY_BEAM_ATTACK_PATH,
         "target_size": None,
         "crop_mode": "beam",
-        "manual_rects": None,
+        "manual_rects": ENERGY_BEAM_ATTACK_RECTS,
         "scale": ENERGY_BEAM_ATTACK_SCALE,
+        "debug_source_path": ENERGY_BEAM_ATTACK_SOURCE_PATH,
     },
     "soul_anchor_ready": {
         "label": "Soul Anchor ready frames",
@@ -352,6 +363,9 @@ def place_on_canvas(surface, target_size, crop_mode):
 def draw_source_rect_debug(sheet, source_rects, output_path):
     DEBUG_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     debug_surface = sheet.copy()
+    if not pygame.font.get_init():
+        pygame.font.init()
+    label_font = pygame.font.Font(None, 42)
     colors = [
         (255, 80, 80),
         (80, 255, 120),
@@ -361,7 +375,12 @@ def draw_source_rect_debug(sheet, source_rects, output_path):
         (255, 150, 60),
     ]
     for index, rect in enumerate(source_rects):
-        pygame.draw.rect(debug_surface, colors[index % len(colors)], rect, 4)
+        color = colors[index % len(colors)]
+        pygame.draw.rect(debug_surface, color, rect, 4)
+        label = label_font.render(str(index + 1), True, (0, 0, 0))
+        label_background = label.get_rect(topleft=(rect.x + 10, rect.y + 10)).inflate(14, 10)
+        pygame.draw.rect(debug_surface, color, label_background)
+        debug_surface.blit(label, label.get_rect(center=label_background.center))
     pygame.image.save(debug_surface, output_path)
 
 
@@ -471,7 +490,14 @@ def load_fixed_frame_sheet(path, frame_count, scale=1.0, target_size=None, debug
     return frames
 
 
-def load_manual_rect_sheet(path, rects, scale=1.0, debug_name=None):
+def load_manual_rect_sheet(
+    path,
+    rects,
+    scale=1.0,
+    debug_name=None,
+    debug_source_path=None,
+    write_debug=None,
+):
     resolved_path = resolve_asset_path(path)
     print("Skill manual rect sheet file path:", resolved_path)
     print("Skill manual rect frame count:", len(rects))
@@ -485,6 +511,10 @@ def load_manual_rect_sheet(path, rects, scale=1.0, debug_name=None):
 
     for rect in rects:
         x, y, width, height = rect
+        if x < 0 or y < 0 or width <= 0 or height <= 0:
+            raise ValueError(f"Invalid manual source rect: {rect}")
+        if x + width > sheet.get_width() or y + height > sheet.get_height():
+            raise ValueError(f"Manual source rect outside {resolved_path.name}: {rect}")
         frame = pygame.Surface((width, height), pygame.SRCALPHA)
         frame.blit(sheet, (0, 0), pygame.Rect(x, y, width, height))
         if scale != 1.0:
@@ -496,19 +526,32 @@ def load_manual_rect_sheet(path, rects, scale=1.0, debug_name=None):
 
     print("[MANUAL RECT LOAD]", resolved_path, "frames:", len(frames), "rects:", rects)
     print("[LOAD]", resolved_path, "frames:", len(frames), "frame_size:", frames[0].get_size() if frames else None)
+    should_write_debug = SKILL_WRITE_DEBUG_PREVIEWS if write_debug is None else write_debug
+    if debug_name and should_write_debug:
+        debug_sheet = sheet
+        if debug_source_path is not None:
+            resolved_debug_path = resolve_asset_path(debug_source_path)
+            debug_sheet = pygame.image.load(str(resolved_debug_path)).convert_alpha()
+        source_rects = [pygame.Rect(*rect) for rect in rects]
+        draw_source_rect_debug(
+            debug_sheet,
+            source_rects,
+            DEBUG_OUTPUT_DIR / f"{debug_name}_source_rects.png",
+        )
+        draw_clean_debug(frames, DEBUG_OUTPUT_DIR / f"{debug_name}_clean_debug.png")
     return frames
 
 
 def get_skill_frames(asset_key):
     if asset_key not in SKILL_FRAME_CACHE:
         config = SKILL_ASSETS[asset_key]
-        if asset_key in PLAYER_SKILL_FRAME_COUNTS:
-            SKILL_FRAME_CACHE[asset_key] = load_fixed_frame_sheet(
+        if config["manual_rects"] is not None and config["target_size"] is None:
+            SKILL_FRAME_CACHE[asset_key] = load_manual_rect_sheet(
                 config["path"],
-                PLAYER_SKILL_FRAME_COUNTS[asset_key],
+                config["manual_rects"],
                 scale=config.get("scale", 1.0),
-                target_size=config["target_size"],
                 debug_name=asset_key,
+                debug_source_path=config.get("debug_source_path"),
             )
         else:
             SKILL_FRAME_CACHE[asset_key] = load_skill_effect_sheet(
@@ -520,6 +563,18 @@ def get_skill_frames(asset_key):
                 debug_name=asset_key,
             )
     return SKILL_FRAME_CACHE[asset_key]
+
+
+def export_energy_beam_attack_debug_previews():
+    config = SKILL_ASSETS["energy_beam_attack"]
+    return load_manual_rect_sheet(
+        config["path"],
+        config["manual_rects"],
+        scale=config["scale"],
+        debug_name="energy_beam_attack",
+        debug_source_path=config["debug_source_path"],
+        write_debug=True,
+    )
 
 
 def print_skill_asset_debug_summary():
