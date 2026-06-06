@@ -69,12 +69,6 @@ def draw_player_ui(screen, player, room_name=None):
         else:
             status = "Block: Ready"
 
-        if player.has_active_shield_throw:
-            special_status = "Special: Shield Returning"
-        elif player.special_cooldown_timer > 0:
-            special_status = "Special: Cooldown"
-        else:
-            special_status = "Special: Shield Throw Ready"
     else:
         if player.is_parrying:
             status = "Parry: Active"
@@ -83,30 +77,21 @@ def draw_player_ui(screen, player, room_name=None):
         else:
             status = "Parry: Ready"
 
-        if weapon["id"] == "grapple_weapon" and player.special_cooldown_timer <= 0:
-            special_status = "Special: Grapple Ready"
-        elif weapon["id"] == "grapple_weapon":
-            special_status = "Special: Cooldown"
-        else:
-            special_status = "Special: None"
-
     status_text = small_font.render(status, True, (230, 230, 230))
-    special_text = small_font.render(special_status, True, (230, 230, 230))
 
     screen.blit(coins_text, (x, 92))
     screen.blit(weapon_text, (x, 118))
     screen.blit(skill_text, (x, 144))
     screen.blit(skill_status_text, (x, 170))
     screen.blit(status_text, (x, 196))
-    screen.blit(special_text, (x, 222))
 
     if player.soul_anchor_active:
         anchor_text = small_font.render(f"Anchor: {player.soul_anchor_timer:.1f}s", True, (120, 255, 180))
-        screen.blit(anchor_text, (x, 248))
+        screen.blit(anchor_text, (x, 222))
 
     if room_name is not None:
         room_text = small_font.render(f"Room: {room_name}", True, (230, 230, 230))
-        screen.blit(room_text, (x, 278))
+        screen.blit(room_text, (x, 252))
 
     if DEBUG_MODE:
         hp_status = "ON" if player.debug_unlimited_hp else "OFF"

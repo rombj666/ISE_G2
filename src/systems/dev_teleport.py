@@ -31,7 +31,7 @@ class DevTeleport:
         {"id": 15, "key": "R", "key_code": pygame.K_r, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Glass Labs", "pos": (1490, 643)},
         {"id": 16, "key": "T", "key_code": pygame.K_t, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Reactor Shaft", "pos": (2400, 474)},
         {"id": 17, "key": "Y", "key_code": pygame.K_y, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Security Lockdown", "pos": (3420, 310)},
-        {"id": 18, "key": "U", "key_code": pygame.K_u, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Flooded Sector", "pos": (4550, 338)},
+        {"id": 18, "key": "\\", "key_code": pygame.K_BACKSLASH, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Flooded Sector", "pos": (4550, 338)},
         {"id": 19, "key": "I", "key_code": pygame.K_i, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Memory Archive", "pos": (6150, 339)},
         {"id": 20, "key": "O", "key_code": pygame.K_o, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Transit Rails", "pos": (7400, 394)},
         {"id": 21, "key": "P", "key_code": pygame.K_p, "map_id": 2, "group": "LEVEL 2 / MAP 2", "name": "Quiet Descent", "pos": (8500, 482)},

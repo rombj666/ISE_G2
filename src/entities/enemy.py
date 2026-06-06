@@ -4,7 +4,6 @@ import pygame
 from PIL import Image, ImageSequence
 
 from settings import (
-    DEBUG_ENEMY_HITBOX,
     ENEMY_ATTACK_TIME,
     ENEMY_MAX_HP,
     ENEMY_RESPAWN_TIME,
@@ -723,16 +722,6 @@ class Enemy:
 
         if self.being_pulled:
             pygame.draw.rect(screen, (240, 220, 255), draw_rect, 2)
-
-        if DEBUG_ENEMY_HITBOX:
-            collision_rect = self.rect
-            attack_rect = self.get_attack_hitbox()
-            if camera:
-                collision_rect = camera.apply_rect(collision_rect)
-                attack_rect = camera.apply_rect(attack_rect)
-            pygame.draw.rect(screen, (80, 255, 120), collision_rect, 2)
-            if self.is_attacking:
-                pygame.draw.rect(screen, (255, 60, 60), attack_rect, 2)
 
         self.draw_hp_bar(screen, camera, visual_rect)
 

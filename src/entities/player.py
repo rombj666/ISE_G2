@@ -232,8 +232,6 @@ class Player:
         self.parry_timer = 0
         self.parry_cooldown_timer = 0
 
-        self.special_cooldown_timer = 0
-
         self.is_auto_grappling = False
         self.auto_grapple_timer = 0
         self.auto_grapple_duration = 0
@@ -259,7 +257,6 @@ class Player:
         self.attack_hitbox = pygame.Rect(0, 0, 1, 1)
         self.attack_has_hit = False
         self.should_spawn_projectile = False
-        self.has_active_shield_throw = False
         self.light_weapon_image = self.load_light_weapon_image()
         def load_weapon_sheet(
             path,
@@ -1091,9 +1088,6 @@ class Player:
 
         if self.attack_cooldown_timer > 0:
             self.attack_cooldown_timer -= dt
-
-        if self.special_cooldown_timer > 0:
-            self.special_cooldown_timer -= dt
 
         if self.parry_cooldown_timer > 0:
             self.parry_cooldown_timer -= dt

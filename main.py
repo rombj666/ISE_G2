@@ -40,7 +40,6 @@ from settings import (
     TIME_FREEZE_RADIUS,
     TIME_FREEZE_STUN_DURATION,
     TITLE,
-    WEAPON_SPECIAL_COOLDOWN,
     PIXELATE_GAME, 
     PIXEL_WIDTH, 
     PIXEL_HEIGHT
@@ -65,7 +64,6 @@ from src.systems.dev_teleport import DevTeleport
 from src.systems.projectile import (
     Projectile,
     ProjectileHitEffect,
-    ReturningShield,
     print_projectile_asset_debug_summary,
 )
 from src.systems.shop import Shop
@@ -115,11 +113,44 @@ MELEE_SPAWNS = [
 MAGE_SPAWNS = [
     {"x": 2216, "y": 300, "mode": "static"},
     {"x": 5350, "y": 500, "mode": "static"},
-    {"x": 8840, "y": 420, "mode": "static"},
+    {"x": 8840, "y": 390, "mode": "static"},  # Last mage moved higher for better platform alignment.
 ]
 LEVEL5_BOSS_MAP_ID = 8
 BOSS_SECTION_BOUNDS = pygame.Rect(BOSS_ARENA_LEFT, BOSS_ARENA_TOP, BOSS_ARENA_RIGHT - BOSS_ARENA_LEFT, BOSS_ARENA_BOTTOM - BOSS_ARENA_TOP)
 BOSS_SECTION_SPAWN = (BOSS_PLAYER_SPAWN_X, BOSS_PLAYER_SPAWN_Y)
+
+
+def draw_start_tutorial(screen, camera, current_map):
+    if current_map.map_id != 0:
+        return
+
+    font = pygame.font.Font(None, 28)
+    lines = [
+        "Controls:",
+        "A / D = Walk",
+        "W / Space = Jump",
+        "Shift = Dash",
+        "J = Attack",
+        "K = Skill",
+        "L = Parry",
+    ]
+    padding = 12
+    line_gap = 4
+    rendered_lines = [font.render(line, True, (245, 245, 255)) for line in lines]
+    panel_width = max(line.get_width() for line in rendered_lines) + padding * 2
+    panel_height = sum(line.get_height() for line in rendered_lines) + line_gap * (len(lines) - 1) + padding * 2
+    screen_x, screen_y = camera.apply_pos((330, 70))
+
+    panel = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+    panel.fill((12, 16, 28, 175))
+    pygame.draw.rect(panel, (180, 195, 225, 190), panel.get_rect(), 1)
+
+    text_y = padding
+    for line in rendered_lines:
+        panel.blit(line, (padding, text_y))
+        text_y += line.get_height() + line_gap
+
+    screen.blit(panel, (screen_x, screen_y))
 
 
 def main():
@@ -159,15 +190,11 @@ def main():
     enemies = []
     archers = []
     archer_arrows = []
-    returning_shields = []
     time_freeze_domains = []
     active_orbit_blades = []
     active_skill_effects = []
     soul_anchor_loops = []
 
-    u_was_pressed = False
-    grapple_special_hitbox = None
-    grapple_special_timer = 0
     enemy_debug_frame = 0
     game_state = "menu"
     show_player_debug_overlay = False
@@ -364,7 +391,6 @@ def main():
         print("Final enemy count:", len(enemies))
 
     def clear_world_objects(reason="map transition reset"):
-        nonlocal u_was_pressed, grapple_special_hitbox, grapple_special_timer
         coins.clear()
         projectiles.clear()
         projectile_hit_effects.clear()
@@ -375,15 +401,10 @@ def main():
             debug_remove_enemy(reason, archer)
         archers.clear()
         archer_arrows.clear()
-        returning_shields.clear()
         time_freeze_domains.clear()
         active_orbit_blades.clear()
         active_skill_effects.clear()
         soul_anchor_loops.clear()
-        player.has_active_shield_throw = False
-        grapple_special_hitbox = None
-        grapple_special_timer = 0
-        u_was_pressed = False
 
     def spawn_map_archers():
         archers.clear()
@@ -773,11 +794,6 @@ def main():
                 boss_section_locked = True
                 camera.set_bounds(BOSS_SECTION_BOUNDS)
 
-            if grapple_special_timer > 0:
-                grapple_special_timer -= dt
-            else:
-                grapple_special_hitbox = None
-
             for domain in time_freeze_domains:
                 domain.update(dt)
             time_freeze_domains = [domain for domain in time_freeze_domains if domain.alive]
@@ -856,36 +872,14 @@ def main():
                 handle_player_attack_enemies(player, enemies)
                 handle_player_attack_archers(player, archers)
                 handle_player_attack_boss(player, pale_core_boss)
-                new_special_hitbox = handle_weapon_special(
-                    keys,
-                    player,
-                    enemies,
-                    archers,
-                    returning_shields,
-                    u_was_pressed,
-                )
-            else:
-                new_special_hitbox = None
-
-            if new_special_hitbox is not None:
-                grapple_special_hitbox = new_special_hitbox
-                grapple_special_timer = 0.12
-
-            if not map_changed:
-                u_was_pressed = keys[pygame.K_u]
 
             update_projectiles(projectiles, dt, platforms, enemies, projectile_hit_effects)
             update_projectile_archer_hits(projectiles, archers, projectile_hit_effects)
             update_projectile_boss_hits(projectiles, pale_core_boss, projectile_hit_effects)
-            update_returning_shields(returning_shields, dt, enemies)
-            update_returning_shield_archer_hits(returning_shields, archers)
-            update_returning_shield_boss_hits(returning_shields, pale_core_boss)
             update_archer_arrows(archer_arrows, dt, player)
             update_orbit_blades(active_orbit_blades, dt, player, enemies, archers, active_skill_effects)
             update_orbit_blade_boss_hits(active_orbit_blades, pale_core_boss)
-            returning_shields = [shield for shield in returning_shields if shield.alive]
             active_orbit_blades = [blade for blade in active_orbit_blades if blade.alive]
-            player.has_active_shield_throw = len(returning_shields) > 0
             for normal_enemy in enemies:
                 handle_enemy_attack(player, normal_enemy)
                 handle_enemy_coin_drop(normal_enemy, coins)
@@ -944,6 +938,7 @@ def main():
         else:
             level_manager.background_draw_callback = None
         level_manager.draw_current_map(screen, camera)
+        draw_start_tutorial(screen, camera, current_map)
 
         current_map = level_manager.get_current_map()
         shop_active = level_manager.get_shop_rect() is not None
@@ -1003,9 +998,6 @@ def main():
         for hit_effect in projectile_hit_effects:
             hit_effect.draw(screen, camera)
 
-        for shield in returning_shields:
-            shield.draw(screen, camera)
-
         for blade in active_orbit_blades:
             blade.draw(screen, camera)
 
@@ -1024,13 +1016,6 @@ def main():
             not hide_custom_weapon_attack_visuals
         ):
             pygame.draw.rect(screen, (70, 140, 255), camera.apply_rect(player.get_attack_hitbox()), 2)
-
-        for normal_enemy in enemies:
-            if normal_enemy.is_attacking and normal_enemy.alive:
-                pygame.draw.rect(screen, (255, 150, 50), camera.apply_rect(normal_enemy.get_attack_hitbox()), 2)
-
-        if grapple_special_hitbox is not None:
-            pygame.draw.rect(screen, (180, 80, 255), camera.apply_rect(grapple_special_hitbox), 2)
 
         nearby_fulcrum = get_nearby_fulcrum(player, fulcrums)
         if nearby_fulcrum is not None and not player.is_auto_grappling:
@@ -1249,74 +1234,6 @@ def handle_player_attack_boss(player, boss):
             print(f"Hit Pale Core weakpoint for {damage} damage")
 
 
-def handle_weapon_special(keys, player, enemies, archers, returning_shields, u_was_pressed):
-    if player.is_auto_grappling:
-        return None
-
-    if not keys[pygame.K_u] or u_was_pressed:
-        return None
-
-    weapon = get_weapon(player.current_weapon_id)
-
-    if player.special_cooldown_timer > 0:
-        return None
-
-    if weapon["id"] == "shield_weapon":
-        return handle_shield_special(player, returning_shields, weapon)
-
-    if weapon["id"] != "grapple_weapon":
-        return None
-
-    special_hitbox = get_grapple_special_hitbox(player)
-
-    for normal_enemy in enemies:
-        if normal_enemy.alive and special_hitbox.colliderect(normal_enemy.rect):
-            normal_enemy.start_pull_to_player(player)
-
-    for archer in archers:
-        if archer.alive and special_hitbox.colliderect(archer.rect):
-            archer.start_pull_to_player(player)
-
-    player.special_cooldown_timer = WEAPON_SPECIAL_COOLDOWN
-    return special_hitbox
-
-
-def handle_shield_special(player, returning_shields, weapon):
-    if player.is_blocking:
-        print("Cannot throw shield while blocking")
-        return None
-
-    if player.has_active_shield_throw:
-        return None
-
-    damage, is_critical = calculate_damage(player, weapon["damage"])
-    shield = ReturningShield(
-        player.rect.centerx,
-        player.rect.centery,
-        player.facing,
-        damage,
-        is_critical,
-        player,
-    )
-    returning_shields.append(shield)
-    player.has_active_shield_throw = True
-    player.special_cooldown_timer = WEAPON_SPECIAL_COOLDOWN
-    print("Shield thrown")
-    return None
-
-
-def get_grapple_special_hitbox(player):
-    weapon = get_weapon("grapple_weapon")
-    hitbox_y = player.rect.centery - weapon["height"] // 2
-
-    if player.facing == 1:
-        hitbox_x = player.rect.right
-    else:
-        hitbox_x = player.rect.left - weapon["range"]
-
-    return pygame.Rect(hitbox_x, hitbox_y, weapon["width"], weapon["height"])
-
-
 def update_projectiles(projectiles, dt, platforms, enemies, projectile_hit_effects):
     for projectile in projectiles:
         projectile.update(dt, platforms)
@@ -1362,55 +1279,6 @@ def update_projectile_boss_hits(projectiles, boss, projectile_hit_effects):
             projectile_hit_effects.append(ProjectileHitEffect(projectile.rect.center))
             projectile.alive = False
             print(f"Projectile hit Pale Core weakpoint for {projectile.damage} damage")
-
-
-def update_returning_shields(returning_shields, dt, enemies):
-    for shield in returning_shields:
-        shield.update(dt)
-        for normal_enemy in enemies:
-            shield.check_enemy_collision(normal_enemy)
-
-
-def update_returning_shield_archer_hits(returning_shields, archers):
-    for shield in returning_shields:
-        for archer in archers:
-            shield.check_enemy_collision(archer)
-
-
-def update_returning_shield_boss_hits(returning_shields, boss):
-    if not boss.active or boss.defeated:
-        return
-
-    for shield in returning_shields:
-        if not shield.alive or shield.hit_cooldown_timer > 0:
-            continue
-        hit_hand = boss.take_hand_damage_at_rect(shield.rect, shield.damage)
-        if hit_hand is not None:
-            shield.hit_cooldown_timer = 0.18
-            if shield.returning:
-                shield.hit_boss_returning = True
-            else:
-                shield.hit_boss_outgoing = True
-            print(f"Shield hit Pale Core {hit_hand.name} hand for {shield.damage} damage")
-            continue
-
-        if not shield.rect.colliderect(boss.weakpoint_rect):
-            continue
-        if not shield.returning:
-            if getattr(shield, "hit_boss_outgoing", False):
-                continue
-            if boss.take_damage(shield.damage):
-                shield.hit_boss_outgoing = True
-                shield.hit_cooldown_timer = 0.18
-                print(f"Shield outgoing hit Pale Core weakpoint for {shield.damage} damage")
-            continue
-
-        if getattr(shield, "hit_boss_returning", False):
-            continue
-        if boss.take_damage(shield.damage):
-            shield.hit_boss_returning = True
-            shield.hit_cooldown_timer = 0.18
-            print(f"Shield returning hit Pale Core weakpoint for {shield.damage} damage")
 
 
 def update_orbit_blades(active_orbit_blades, dt, player, enemies, archers, active_skill_effects):

@@ -3768,7 +3768,6 @@ class LevelManager:
         player.is_parrying = False
         player.attack_has_hit = False
         player.should_spawn_projectile = False
-        player.has_active_shield_throw = False
         player.auto_grapple_start = None
         player.auto_grapple_end = None
         player.auto_grapple_control = None
