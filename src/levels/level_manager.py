@@ -3170,7 +3170,7 @@ class LevelManager:
         player_spawn = tiled["player_spawn"] or (160, (tiled["height"] or MAP_8_HEIGHT) - 80)
         return GameMap(
             8,
-            "Level 5 - House of Architecture",
+            "Lunar Chamber",
             tiled["width"] or MAP_8_WIDTH,
             tiled["height"] or MAP_8_HEIGHT,
             tiled["platforms"],
