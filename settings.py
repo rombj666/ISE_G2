@@ -2,7 +2,7 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 FPS = 60
 
-TITLE = "Moonbound Prototype"
+TITLE = "Borrowed Light"
 
 CAMERA_SMOOTHING = 0.12
 
