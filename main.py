@@ -199,6 +199,7 @@ def main():
 
     enemy_debug_frame = 0
     game_state = "menu"
+    opening_dialogue_seen = False
     show_player_debug_overlay = False
     killed_enemy_ids = set()
     boss_section_locked = False
@@ -563,8 +564,9 @@ def main():
         pale_core_boss.active = False
         return True
 
-    def restart_game():
+    def restart_game(show_opening_dialogue=False):
         nonlocal game_state, boss_section_locked, boss_room_debug_printed
+        nonlocal opening_dialogue_seen
         killed_enemy_ids.clear()
         boss_section_locked = False
         boss_room_debug_printed = False
@@ -580,8 +582,12 @@ def main():
         player.vel_x = 0
         player.vel_y = 0
         enter_map(0)
-        dialogue.reset_for_new_run()
-        dialogue.start("opening")
+        dialogue.active = False
+        if show_opening_dialogue:
+            dialogue.reset_for_new_run()
+            if not opening_dialogue_seen:
+                dialogue.start("opening")
+                opening_dialogue_seen = True
         game_state = "playing"
 
     running = True
@@ -739,7 +745,7 @@ def main():
 
             if origin_story.should_start_game:
                 origin_story.should_start_game = False
-                restart_game()
+                restart_game(show_opening_dialogue=True)
                 continue
 
             origin_story.draw(screen)
