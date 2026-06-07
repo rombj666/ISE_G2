@@ -197,6 +197,7 @@ class Player:
         self.jump_count = 0
         self.max_jumps = 2
         self.jump_pressed = False
+        self.is_moving_input = False
         self.acceleration = 0.6
         self.friction = 0.85
         self.max_speed = PLAYER_SPEED
@@ -469,6 +470,8 @@ class Player:
         self.attack_animation_speed = LIGHT_ATTACK_ANIMATION_SPEED
         self.attack_animation_weapon_id = None
         self.last_jump_animation_debug_state = None
+        self.current_weapon_visual_state = None
+        self.jump_landing_timer = 0
         self.light_anim_offset_x = LIGHT_ANIM_OFFSET_X
         self.light_anim_offset_y = LIGHT_ANIM_OFFSET_Y
         self.light_attack_offset_x = LIGHT_ATTACK_OFFSET_X
@@ -567,6 +570,7 @@ class Player:
 
         moving_left = keys[pygame.K_a] or keys[pygame.K_LEFT]
         moving_right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
+        self.is_moving_input = moving_left or moving_right
         jump_key_pressed = keys[pygame.K_SPACE] or keys[pygame.K_w]
         drop_pressed = keys[pygame.K_s] or keys[pygame.K_DOWN]
 
@@ -605,6 +609,8 @@ class Player:
                 self.on_ground = False
                 self.current_action = None
                 self.jump_state = "rising"
+                self.jump_landing_timer = 0
+                self.reset_weapon_state_animation("jump")
             self.jump_pressed = True
         elif not jump_key_pressed:
             self.jump_pressed = False
@@ -693,6 +699,7 @@ class Player:
     def start_dash(self):
         self.is_attacking = False
         self.current_action = "idle"
+        self.reset_weapon_state_animation("dash")
 
         self.is_dashing = True
         self.dash_timer = PLAYER_DASH_TIME
@@ -1344,16 +1351,27 @@ class Player:
     def get_visual_state(self):
         if self.attack_animation_playing:
             return "attack"
+        if self.is_dashing and self.dash_timer > 0:
+            return "dash"
+        if self.jump_landing_timer > 0:
+            return "jump"
         if not self.on_ground:
             return "jump"
-        if self.is_dashing:
-            return "dash"
-        if abs(self.vel_x) > 0.1:
+        if self.is_moving_input and abs(self.vel_x) > 0.5:
             return "walk"
         return "idle"
 
     def update_weapon_state_animation(self, weapon_prefix, visual_state, dt):
         frames, speed = self.get_weapon_state_frames_and_speed(weapon_prefix, visual_state)
+        state_key = f"{weapon_prefix}_{visual_state}"
+        if self.current_weapon_visual_state != state_key:
+            self.current_weapon_visual_state = state_key
+            self.reset_weapon_state_animation(visual_state, weapon_prefix)
+
+        if visual_state == "jump":
+            self.update_weapon_jump_frame(frames, dt)
+            return
+
         self.update_looping_animation(
             dt,
             frames,
@@ -1361,6 +1379,37 @@ class Player:
             f"{weapon_prefix}_{visual_state}_timer",
             speed,
         )
+
+    def reset_weapon_state_animation(self, visual_state, weapon_prefix=None):
+        weapon_prefix = weapon_prefix or self.normalize_weapon_id(self.current_weapon_id)
+        index_attr = f"{weapon_prefix}_{visual_state}_index"
+        timer_attr = f"{weapon_prefix}_{visual_state}_timer"
+        if hasattr(self, index_attr):
+            setattr(self, index_attr, 0)
+        if hasattr(self, timer_attr):
+            setattr(self, timer_attr, 0)
+
+    def set_jump_frame(self, frame_index):
+        weapon_prefix = self.normalize_weapon_id(self.current_weapon_id)
+        index_attr = f"{weapon_prefix}_jump_index"
+        if hasattr(self, index_attr):
+            frames, _ = self.get_weapon_state_frames_and_speed(weapon_prefix, "jump")
+            max_index = max(0, len(frames) - 1)
+            setattr(self, index_attr, min(frame_index, max_index))
+
+    def update_weapon_jump_frame(self, frames, dt):
+        if not frames:
+            return
+
+        if self.jump_landing_timer > 0:
+            self.jump_landing_timer = max(0, self.jump_landing_timer - dt)
+            self.set_jump_frame(3)
+        elif self.vel_y < 0:
+            self.set_jump_frame(1 if len(frames) > 1 else 0)
+        elif self.vel_y > 0:
+            self.set_jump_frame(2 if len(frames) > 2 else len(frames) - 1)
+        else:
+            self.set_jump_frame(0)
 
     def update_looping_animation(self, dt, frames, index_attr, timer_attr, speed):
         if not frames:
@@ -1455,6 +1504,8 @@ class Player:
                 self.vel_y = 0
                 self.on_ground = True
                 self.jump_count = 0
+                self.jump_landing_timer = max(self.jump_landing_timer, 0.12)
+                self.set_jump_frame(3)
                 break
 
             if self.rect.colliderect(platform):
@@ -1463,6 +1514,8 @@ class Player:
                     self.vel_y = 0
                     self.on_ground = True
                     self.jump_count = 0
+                    self.jump_landing_timer = max(self.jump_landing_timer, 0.12)
+                    self.set_jump_frame(3)
                     break
                 elif self.vel_y < 0:
                     self.rect.top = platform.bottom
@@ -1483,12 +1536,6 @@ class Player:
 
     def draw(self, screen, camera=None):
         if self.draw_attack_animation(screen, camera):
-            return
-
-        if not self.on_ground and self.draw_weapon_specific_state_animation("jump", screen, camera):
-            return
-
-        if self.is_dashing and self.draw_weapon_specific_state_animation("dash", screen, camera):
             return
 
         if self.draw_custom_weapon_movement_animation(screen, camera):

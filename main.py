@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pygame
 
+from src.audio.audio import MusicManager
 from settings import (
     COIN_PICKUP_RANGE,
     COIN_VALUE,
@@ -160,6 +161,7 @@ def main():
     screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT)).convert()
     pygame.display.set_caption(TITLE)
     clock = pygame.time.Clock()
+    music_manager = MusicManager()
     print_skill_asset_debug_summary()
     print_projectile_asset_debug_summary()
 
@@ -590,6 +592,7 @@ def main():
         k_pressed = False
         current_map = level_manager.get_current_map()
         shop_active = level_manager.get_shop_rect() is not None
+        music_manager.update_for_game(game_state, current_map.map_id, LEVEL5_BOSS_MAP_ID)
 
         if not shop_active and shop.is_open:
             shop.close()
