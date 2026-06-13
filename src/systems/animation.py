@@ -176,7 +176,14 @@ def load_sprite_sheet(
     )
 
 
-def load_fixed_frame_sheet(path, frame_count, frame_width, frame_height, debug_name=None):
+def load_fixed_frame_sheet(
+    path,
+    frame_count,
+    frame_width=None,
+    frame_height=None,
+    debug_name=None,
+    target_size=None,
+):
     path = Path(path)
     if debug_name:
         print(f"{debug_name} path: {path}")
@@ -192,14 +199,44 @@ def load_fixed_frame_sheet(path, frame_count, frame_width, frame_height, debug_n
         print(f"Warning: Could not load fixed-frame sprite sheet {path}: {error}")
         return []
 
+    sheet_width, sheet_height = sheet.get_size()
+    if frame_count <= 0:
+        print(f"Warning: invalid frame count {frame_count}: {path}")
+        return []
+
+    source_frame_width = sheet_width // frame_count
+    source_frame_height = sheet_height
+    if source_frame_width <= 0:
+        print(f"Warning: sprite sheet too narrow for {frame_count} frames: {path}")
+        return []
+
+    if sheet_width % frame_count != 0:
+        print(
+            f"Warning: sheet width {sheet_width} is not evenly divisible by "
+            f"{frame_count}: {path}"
+        )
+
+    if target_size is None and frame_width and frame_height:
+        target_size = (frame_width, frame_height)
+
+    if debug_name:
+        print(f"{debug_name} sheet size: {sheet_width}x{sheet_height}")
+        print(f"{debug_name} frame count: {frame_count}")
+        print(
+            f"{debug_name} calculated frame size: "
+            f"{source_frame_width}x{source_frame_height}"
+        )
+
     frames = []
     for index in range(frame_count):
-        frame_rect = pygame.Rect(index * frame_width, 0, frame_width, frame_height)
-        if frame_rect.right > sheet.get_width() or frame_rect.bottom > sheet.get_height():
-            print(f"Warning: fixed-frame sheet too small for frame {index}: {path}")
-            break
+        left = round(index * sheet_width / frame_count)
+        right = round((index + 1) * sheet_width / frame_count)
+        frame_rect = pygame.Rect(left, 0, right - left, source_frame_height)
 
         frame = sheet.subsurface(frame_rect).copy()
+        if target_size and frame.get_size() != target_size:
+            frame = scale_to_target_box(frame, target_size)
+
         if debug_name:
             alpha_bounds = frame.get_bounding_rect()
             print(
@@ -211,7 +248,9 @@ def load_fixed_frame_sheet(path, frame_count, frame_width, frame_height, debug_n
 
     print(f"Loaded fixed-frame sprite sheet: {path}")
     print(f"Frame count: {len(frames)}")
-    print(f"Frame canvas size: {frame_width}x{frame_height}")
+    print(f"Source frame size: {source_frame_width}x{source_frame_height}")
+    if target_size:
+        print(f"Frame canvas size: {target_size[0]}x{target_size[1]}")
     return frames
 
 

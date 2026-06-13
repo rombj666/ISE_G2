@@ -3761,6 +3761,8 @@ class LevelManager:
             player.on_ground = False
         player.is_dashing = False
         player.is_attacking = False
+        if hasattr(player, "clear_attack_animation"):
+            player.clear_attack_animation()
         player.is_auto_grappling = False
         if hasattr(player, "cancel_swing"):
             player.cancel_swing()

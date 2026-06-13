@@ -8,6 +8,7 @@ from src.systems.animation import load_fixed_frame_sheet
 from settings import (
     AUTO_GRAPPLE_ARC_HEIGHT,
     AUTO_GRAPPLE_DURATION,
+    DEBUG_MODE,
     DEBUG_UNLIMITED_HP,
     DEBUG_UNLIMITED_MANA,
     GRAVITY,
@@ -123,6 +124,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LIGHT_WEAPON_IMAGE_PATH = PROJECT_ROOT / "assets" / "weapons" / "light_weapon.png"
 PROCESSED_ANIMATION_ROOT = PROJECT_ROOT / "assets" / "processed" / "animations"
 PROCESSED_WEAPON_ROOT = PROJECT_ROOT / "assets" / "processed" / "weapons"
+DEBUG_EXPORT_ROOT = PROJECT_ROOT / "assets" / "processed" / "debug"
 DEBUG_ATTACK_ANIMATION = True
 DEBUG_JUMP_ANIMATION = True
 LIGHT_WEAPON_IDLE_SHEET_PATH = PROCESSED_ANIMATION_ROOT / "light_weapon_idle_clean.png"
@@ -202,6 +204,8 @@ class Player:
         self.friction = 0.85
         self.max_speed = PLAYER_SPEED
         self.on_ground = True
+        self.tracked_action = "idle"
+        self.previous_action = "idle"
         self.drop_through_timer = 0
         self.previous_bottom = self.rect.bottom
 
@@ -258,6 +262,8 @@ class Player:
         self.attack_hitbox = pygame.Rect(0, 0, 1, 1)
         self.attack_has_hit = False
         self.should_spawn_projectile = False
+        self.image = None
+        self.visual_rect = pygame.Rect(self.rect)
         self.light_weapon_image = self.load_light_weapon_image()
         def load_weapon_sheet(
             path,
@@ -269,15 +275,15 @@ class Player:
             return load_fixed_frame_sheet(
                 path,
                 frame_count,
-                target_size[0],
-                target_size[1],
-                debug_name=debug_name,
+                target_size=target_size,
+                debug_name=debug_name if DEBUG_MODE else None,
             )
 
         self.light_weapon_idle_frames = load_weapon_sheet(
             LIGHT_WEAPON_IDLE_SHEET_PATH,
             LIGHT_IDLE_FRAME_COUNT,
             (LIGHT_PLAYER_TARGET_WIDTH, LIGHT_PLAYER_TARGET_HEIGHT),
+            debug_name="light idle",
             padding=6,
         )
         self.light_weapon_walk_frames = load_weapon_sheet(
@@ -308,6 +314,7 @@ class Player:
             HEAVY_WEAPON_IDLE_SHEET_PATH,
             HEAVY_IDLE_FRAME_COUNT,
             (HEAVY_PLAYER_TARGET_WIDTH, HEAVY_PLAYER_TARGET_HEIGHT),
+            debug_name="heavy idle",
         )
         self.heavy_weapon_walk_frames = load_weapon_sheet(
             HEAVY_WEAPON_WALK_SHEET_PATH,
@@ -335,6 +342,7 @@ class Player:
             SHOOTER_WEAPON_IDLE_SHEET_PATH,
             SHOOTER_IDLE_FRAME_COUNT,
             (SHOOTER_PLAYER_TARGET_WIDTH, SHOOTER_PLAYER_TARGET_HEIGHT),
+            debug_name="shooter idle",
         )
         self.shooter_weapon_walk_frames = load_weapon_sheet(
             SHOOTER_WEAPON_WALK_SHEET_PATH,
@@ -365,6 +373,7 @@ class Player:
             SHIELD_WEAPON_IDLE_SHEET_PATH,
             SHIELD_IDLE_FRAME_COUNT,
             (SHIELD_PLAYER_TARGET_WIDTH, SHIELD_PLAYER_TARGET_HEIGHT),
+            debug_name="shield idle",
         )
         self.shield_weapon_walk_frames = load_weapon_sheet(
             SHIELD_WEAPON_WALK_SHEET_PATH,
@@ -395,6 +404,7 @@ class Player:
             GRAPPLE_WEAPON_IDLE_SHEET_PATH,
             GRAPPLE_IDLE_FRAME_COUNT,
             (GRAPPLE_PLAYER_TARGET_WIDTH, GRAPPLE_PLAYER_TARGET_HEIGHT),
+            debug_name="grapple idle",
         )
         self.grapple_weapon_walk_frames = load_weapon_sheet(
             GRAPPLE_WEAPON_WALK_SHEET_PATH,
@@ -469,6 +479,7 @@ class Player:
         self.attack_animation_flip = False
         self.attack_animation_speed = LIGHT_ATTACK_ANIMATION_SPEED
         self.attack_animation_weapon_id = None
+        self.debug_exports_done = set()
         self.last_jump_animation_debug_state = None
         self.current_weapon_visual_state = None
         self.jump_landing_timer = 0
@@ -634,6 +645,7 @@ class Player:
             return
 
         weapon = get_weapon(weapon_id)
+        self.clear_attack_animation()
         self.current_weapon_id = weapon["id"]
         self.is_attacking = False
         self.attack_has_hit = False
@@ -698,6 +710,7 @@ class Player:
 
     def start_dash(self):
         self.is_attacking = False
+        self.clear_attack_animation()
         self.current_action = "idle"
         self.reset_weapon_state_animation("dash")
 
@@ -813,6 +826,14 @@ class Player:
             print("first frame size:", frames[0].get_size() if frames else None)
         return True
 
+    def clear_attack_animation(self):
+        self.attack_animation_playing = False
+        self.attack_animation_index = 0
+        self.attack_animation_timer = 0
+        self.attack_animation_frames = []
+        self.attack_animation_weapon_id = None
+        self.attack_animation_flip = False
+
     def get_attack_hitbox(self):
         weapon = get_weapon(self.current_weapon_id)
         hitbox_y = self.rect.centery - weapon["height"] // 2
@@ -863,6 +884,7 @@ class Player:
         if self.current_hp <= 0:
             self.is_dead = True
             self.is_attacking = False
+            self.clear_attack_animation()
             self.is_dashing = False
             self.is_blocking = False
             self.vel_x = 0
@@ -888,6 +910,7 @@ class Player:
         self.cancel_swing()
         self.is_dashing = False
         self.is_attacking = False
+        self.clear_attack_animation()
         self.is_blocking = False
         self.is_parrying = False
         self.vel_x = 0
@@ -959,6 +982,7 @@ class Player:
         self.is_auto_grappling = False
         self.is_dashing = False
         self.is_attacking = False
+        self.clear_attack_animation()
         self.is_blocking = False
         self.is_parrying = False
         self.vel_x = 0
@@ -1080,6 +1104,7 @@ class Player:
 
         self.move_x(platforms)
         self.move_y(platforms)
+        self.update_action_tracking()
         self.update_weapon_movement_animation(dt)
 
         self.update_animation(dt)
@@ -1309,12 +1334,7 @@ class Player:
             self.attack_animation_index += 1
 
             if self.attack_animation_index >= len(self.attack_animation_frames):
-                self.attack_animation_playing = False
-                self.attack_animation_index = 0
-                self.attack_animation_timer = 0
-                self.attack_animation_frames = []
-                self.attack_animation_weapon_id = None
-                self.attack_animation_flip = False
+                self.clear_attack_animation()
                 print("[ATTACK FINISHED]")
                 return
 
@@ -1349,17 +1369,21 @@ class Player:
             return
 
     def get_visual_state(self):
-        if self.attack_animation_playing:
+        if self.is_attacking or self.attack_animation_playing:
             return "attack"
         if self.is_dashing and self.dash_timer > 0:
             return "dash"
-        if self.jump_landing_timer > 0:
-            return "jump"
         if not self.on_ground:
             return "jump"
-        if self.is_moving_input and abs(self.vel_x) > 0.5:
+        if abs(self.vel_x) > 0.5 or self.is_moving_input:
             return "walk"
         return "idle"
+
+    def update_action_tracking(self):
+        action = self.get_visual_state()
+        if action != self.tracked_action:
+            self.previous_action = self.tracked_action
+            self.tracked_action = action
 
     def update_weapon_state_animation(self, weapon_prefix, visual_state, dt):
         frames, speed = self.get_weapon_state_frames_and_speed(weapon_prefix, visual_state)
@@ -1370,6 +1394,7 @@ class Player:
 
         if visual_state == "jump":
             self.update_weapon_jump_frame(frames, dt)
+            self.set_visual_frame(self.get_custom_weapon_frame(weapon_prefix, visual_state))
             return
 
         self.update_looping_animation(
@@ -1379,6 +1404,16 @@ class Player:
             f"{weapon_prefix}_{visual_state}_timer",
             speed,
         )
+        self.set_visual_frame(self.get_custom_weapon_frame(weapon_prefix, visual_state))
+
+    def set_visual_frame(self, new_frame):
+        if new_frame is None:
+            return
+
+        old_midbottom = self.rect.midbottom
+        self.image = new_frame
+        self.visual_rect = self.image.get_rect()
+        self.visual_rect.midbottom = old_midbottom
 
     def reset_weapon_state_animation(self, visual_state, weapon_prefix=None):
         weapon_prefix = weapon_prefix or self.normalize_weapon_id(self.current_weapon_id)
@@ -1504,8 +1539,7 @@ class Player:
                 self.vel_y = 0
                 self.on_ground = True
                 self.jump_count = 0
-                self.jump_landing_timer = max(self.jump_landing_timer, 0.12)
-                self.set_jump_frame(3)
+                self._finish_landing()
                 break
 
             if self.rect.colliderect(platform):
@@ -1514,13 +1548,42 @@ class Player:
                     self.vel_y = 0
                     self.on_ground = True
                     self.jump_count = 0
-                    self.jump_landing_timer = max(self.jump_landing_timer, 0.12)
-                    self.set_jump_frame(3)
+                    self._finish_landing()
                     break
                 elif self.vel_y < 0:
                     self.rect.top = platform.bottom
                     self.vel_y = 0
                     break
+
+        if not self.on_ground:
+            self._restore_ground_contact(platforms)
+
+    def _restore_ground_contact(self, platforms):
+        if self.vel_y < 0 or self.drop_through_timer > 0:
+            return
+
+        for platform in platforms:
+            horizontal_overlap = (
+                self.rect.right > platform.left + 5
+                and self.rect.left < platform.right - 5
+            )
+            touching_top = abs(self.rect.bottom - platform.top) <= 1
+            if horizontal_overlap and touching_top:
+                self.rect.bottom = platform.top
+                self.vel_y = 0
+                self.on_ground = True
+                self.jump_count = 0
+                self._finish_landing()
+                return
+
+    def _finish_landing(self):
+        self.jump_landing_timer = 0
+        self.jump_state = "rising"
+        self.set_jump_frame(0)
+
+    @property
+    def grounded(self):
+        return self.on_ground
 
     def _is_one_way_platform(self, platform):
         return platform.height <= 24
@@ -1594,6 +1657,56 @@ class Player:
                 end_pos = camera.apply_pos(end_pos)
             pygame.draw.line(screen, (130, 210, 255), start_pos, end_pos, 2)
 
+    def draw_player_image_only(self, screen, camera=None):
+        raw_frame = None
+        offset_x = 0
+        offset_y = 0
+        flip_x = self.facing == -1
+
+        if self.attack_animation_playing and self.attack_animation_frames:
+            frame_index = min(
+                self.attack_animation_index,
+                len(self.attack_animation_frames) - 1,
+            )
+            raw_frame = self.attack_animation_frames[frame_index]
+            offset_x, offset_y = self.get_attack_animation_offset()
+            if self.facing == -1:
+                offset_x = -offset_x
+            flip_x = self.attack_animation_flip
+        else:
+            visual_state = self.get_visual_state()
+            weapon_key = self.normalize_weapon_id(self.current_weapon_id)
+            frames, frame_index, _ = self.get_custom_weapon_frames_for_state(
+                weapon_key,
+                visual_state,
+            )
+            if frames:
+                raw_frame = frames[min(frame_index, len(frames) - 1)]
+                offset_x, offset_y = self.get_custom_weapon_movement_offset(weapon_key)
+
+        if raw_frame is None:
+            raw_frame = self.image
+        if raw_frame is None and self.current_animation:
+            raw_frame = self.current_animation.get_frame()
+        if raw_frame is None:
+            return
+
+        self.set_visual_frame(raw_frame)
+        final_frame = (
+            pygame.transform.flip(raw_frame, True, False)
+            if flip_x
+            else raw_frame
+        )
+        if self.get_visual_state() == "idle":
+            self.export_idle_debug_frames(final_frame, raw_frame)
+
+        frame_rect = final_frame.get_rect(midbottom=self.visual_rect.midbottom)
+        frame_rect.x += offset_x
+        frame_rect.y += offset_y
+        if camera:
+            frame_rect = camera.apply_rect(frame_rect)
+        screen.blit(final_frame, frame_rect)
+
     def draw_attack_animation(self, screen, camera=None):
         if not self.attack_animation_playing:
             return False
@@ -1610,11 +1723,11 @@ class Player:
 
         frame_index = min(self.attack_animation_index, len(self.attack_animation_frames) - 1)
         frame = self.attack_animation_frames[frame_index]
+        self.set_visual_frame(frame)
         if self.attack_animation_flip:
             frame = pygame.transform.flip(frame, True, False)
 
-        frame_rect = frame.get_rect()
-        frame_rect.midbottom = self.rect.midbottom
+        frame_rect = frame.get_rect(midbottom=self.visual_rect.midbottom)
         offset_x, offset_y = self.get_attack_animation_offset()
         if self.facing == -1:
             offset_x = -offset_x
@@ -1628,6 +1741,7 @@ class Player:
             print("[ATTACK DRAW FRAME]", "size:", frame.get_size(), "rect:", frame_rect)
 
         screen.blit(frame, frame_rect)
+        self.draw_animation_debug(screen, camera)
         return True
 
     def get_attack_animation_offset(self):
@@ -1644,11 +1758,15 @@ class Player:
         return self.light_attack_offset_x, self.light_attack_offset_y
 
     def draw_custom_weapon_frame(self, screen, frame, offset_x=0, offset_y=0, camera=None):
+        raw_frame = frame
+        self.set_visual_frame(frame)
         if self.facing == -1:
             frame = pygame.transform.flip(frame, True, False)
 
-        frame_rect = frame.get_rect()
-        frame_rect.midbottom = self.rect.midbottom
+        if self.get_visual_state() == "idle":
+            self.export_idle_debug_frames(frame, raw_frame)
+
+        frame_rect = frame.get_rect(midbottom=self.visual_rect.midbottom)
         frame_rect.x += offset_x
         frame_rect.y += offset_y
 
@@ -1656,6 +1774,128 @@ class Player:
             frame_rect = camera.apply_rect(frame_rect)
 
         screen.blit(frame, frame_rect)
+        self.draw_animation_debug(screen, camera)
+
+    def export_idle_debug_frames(self, final_frame, raw_frame):
+        weapon_key = self.normalize_weapon_id(self.current_weapon_id)
+        frames, frame_index, _ = self.get_custom_weapon_frames_for_state(
+            weapon_key,
+            "idle",
+        )
+        if not frames:
+            return
+
+        export_key = (weapon_key, "idle")
+        if export_key in self.debug_exports_done:
+            return
+
+        self.debug_exports_done.add(export_key)
+        try:
+            DEBUG_EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
+            pygame.image.save(
+                final_frame,
+                str(DEBUG_EXPORT_ROOT / "final_player_image_idle.png"),
+            )
+            pygame.image.save(
+                raw_frame,
+                str(DEBUG_EXPORT_ROOT / "raw_loaded_idle_frame.png"),
+            )
+        except (OSError, pygame.error) as error:
+            print(
+                "[DEBUG EXPORT WARNING] Could not save idle debug frame:",
+                error,
+            )
+            return
+
+        print(
+            "[PLAYER IDLE DEBUG EXPORT]",
+            weapon_key,
+            "frame:",
+            frame_index,
+            "facing:",
+            self.facing,
+        )
+
+    def get_debug_animation_state(self):
+        action = self.get_visual_state()
+        weapon_key = self.normalize_weapon_id(self.current_weapon_id)
+        if action == "attack":
+            frame_index = self.attack_animation_index
+            full_body_active = bool(self.attack_animation_frames)
+        else:
+            frames, frame_index, _ = self.get_custom_weapon_frames_for_state(
+                weapon_key,
+                action,
+            )
+            full_body_active = bool(frames)
+
+        return {
+            "weapon": self.current_weapon_id,
+            "action": action,
+            "previous_action": self.previous_action,
+            "frame_index": frame_index,
+            "on_ground": self.on_ground,
+            "grounded": self.grounded,
+            "vel_y": self.vel_y,
+            "rect_bottom": self.rect.bottom,
+            "visual_rect_bottom": (
+                self.visual_rect.bottom if self.visual_rect is not None else None
+            ),
+            "afterimage_active": self.is_dashing and self.dash_timer > 0,
+            "weapon_overlay_active": (
+                not full_body_active and self.current_weapon_id == "light_weapon"
+            ),
+        }
+
+    def draw_debug_animation_status(self, screen):
+        state = self.get_debug_animation_state()
+        lines = [
+            f"weapon: {state['weapon']}",
+            f"action: {state['action']}",
+            f"previous action: {state['previous_action']}",
+            f"frame: {state['frame_index']}",
+            f"on_ground: {state['on_ground']}",
+            f"grounded: {state['grounded']}",
+            f"vel_y: {state['vel_y']:.3f}",
+            f"rect.bottom: {state['rect_bottom']}",
+            f"visual_rect.bottom: {state['visual_rect_bottom']}",
+            f"afterimage/trail: {state['afterimage_active']}",
+            f"weapon overlay: {state['weapon_overlay_active']}",
+        ]
+        font = pygame.font.SysFont("consolas", 16, bold=True)
+        padding = 10
+        rendered = [font.render(line, True, (220, 242, 255)) for line in lines]
+        width = max(item.get_width() for item in rendered) + padding * 2
+        height = sum(item.get_height() for item in rendered) + padding * 2
+        panel = pygame.Surface((width, height), pygame.SRCALPHA)
+        panel.fill((5, 12, 22, 225))
+        pygame.draw.rect(panel, (112, 216, 255), panel.get_rect(), 2)
+        y = padding
+        for item in rendered:
+            panel.blit(item, (padding, y))
+            y += item.get_height()
+        screen.blit(panel, (12, 12))
+
+    def draw_animation_debug(self, screen, camera=None):
+        if not DEBUG_MODE:
+            return
+
+        debug_rect = self.rect.copy()
+        midbottom = self.rect.midbottom
+        if camera:
+            debug_rect = camera.apply_rect(debug_rect)
+            midbottom = camera.apply_pos(midbottom)
+
+        pygame.draw.rect(screen, (255, 80, 80), debug_rect, 1)
+        pygame.draw.circle(screen, (80, 255, 120), midbottom, 3)
+
+        font = pygame.font.Font(None, 20)
+        label = font.render(
+            f"{self.current_weapon_id} / {self.get_visual_state()}",
+            True,
+            (255, 245, 120),
+        )
+        screen.blit(label, label.get_rect(midbottom=(debug_rect.centerx, debug_rect.top - 4)))
 
     def draw_custom_weapon_movement_animation(self, screen, camera=None):
         visual_state = self.get_visual_state()

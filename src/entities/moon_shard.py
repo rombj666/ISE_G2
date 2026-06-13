@@ -2,6 +2,12 @@ import math
 
 import pygame
 
+MOON_SHARD_OFFSET_X = 55
+MOON_SHARD_OFFSET_Y = -75
+MOON_SHARD_GLOW_SCALE = 0.6
+MOON_SHARD_GLOW_ALPHA_SCALE = 0.65
+
+
 class MoonShard:
     """
     A glowing crystalline moon shard that floats beside the player at all times.
@@ -17,32 +23,26 @@ class MoonShard:
         self.smoothing = 0.22
         # How fast the shard arcs from one side to the other when player turns (0..1).
         self.side_swap_speed = 0.05
-        # Base distance from the player's center on whichever side it's on.
-        self.side_distance = 70
-        self.offset_y = -30
         # Current horizontal offset — animates smoothly toward target_offset_x.
         # Negative = on the player's LEFT, positive = on the player's RIGHT.
         # Default to the right side (player spawns facing right).
-        self.offset_x = -self.side_distance
-        self.target_offset_x = -self.side_distance
+        self.offset_x = MOON_SHARD_OFFSET_X
+        self.target_offset_x = MOON_SHARD_OFFSET_X
         # Particle ring — orbits around the shard.
         self.particle_count = 5
 
     def reset_to(self, player_rect, player_facing=1):
-        """Snap the shard to the player's TRAILING side immediately (use on map change)."""
-        # Trail on the side OPPOSITE the facing direction so it doesn't block forward view.
-        self.target_offset_x = -self.side_distance * player_facing
+        """Snap the shard to its player-relative position immediately."""
+        self.target_offset_x = MOON_SHARD_OFFSET_X * player_facing
         self.offset_x = self.target_offset_x
         self.x = float(player_rect.centerx + self.offset_x)
-        self.y = float(player_rect.top + self.offset_y)
+        self.y = float(player_rect.centery + MOON_SHARD_OFFSET_Y)
 
     def update(self, dt, player_rect, player_facing=1):
         self.time += dt
 
-        # Pick the trailing side based on the player's facing direction:
-        # facing right (+1)  -> shard on LEFT  (offset_x = -70)
-        # facing left  (-1)  -> shard on RIGHT (offset_x = +70)
-        self.target_offset_x = -self.side_distance * player_facing
+        # Facing right places it above-right; facing left places it above-left.
+        self.target_offset_x = MOON_SHARD_OFFSET_X * player_facing
 
         # Smoothly arc the offset toward the new side when the player turns around.
         self.offset_x += (self.target_offset_x - self.offset_x) * self.side_swap_speed
@@ -52,7 +52,7 @@ class MoonShard:
         sway = math.sin(self.time * 1.5) * 5
 
         target_x = player_rect.centerx + self.offset_x + sway
-        target_y = player_rect.top + self.offset_y + bob
+        target_y = player_rect.centery + MOON_SHARD_OFFSET_Y + bob
 
         # Smooth lerp toward the target — gives a tiny lag like a tethered spirit.
         self.x += (target_x - self.x) * self.smoothing
@@ -67,8 +67,8 @@ class MoonShard:
         pulse = (math.sin(self.time * 3.2) + 1.0) * 0.5
 
         # ─── Outer halo (large, very transparent) ────────────────────────
-        halo_radius = int(28 + pulse * 10)
-        halo_alpha = int(28 + pulse * 22)
+        halo_radius = max(1, int((28 + pulse * 10) * MOON_SHARD_GLOW_SCALE))
+        halo_alpha = int((28 + pulse * 22) * MOON_SHARD_GLOW_ALPHA_SCALE)
         halo_surf = pygame.Surface((halo_radius * 2, halo_radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(
             halo_surf,
@@ -79,8 +79,8 @@ class MoonShard:
         screen.blit(halo_surf, (sx - halo_radius, sy - halo_radius))
 
         # ─── Mid glow (smaller, brighter) ────────────────────────────────
-        mid_radius = int(16 + pulse * 5)
-        mid_alpha = int(70 + pulse * 60)
+        mid_radius = max(1, int((16 + pulse * 5) * MOON_SHARD_GLOW_SCALE))
+        mid_alpha = int((70 + pulse * 60) * MOON_SHARD_GLOW_ALPHA_SCALE)
         mid_surf = pygame.Surface((mid_radius * 2, mid_radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(
             mid_surf,
@@ -91,8 +91,8 @@ class MoonShard:
         screen.blit(mid_surf, (sx - mid_radius, sy - mid_radius))
 
         # ─── Inner glow tight around the shard ───────────────────────────
-        inner_radius = int(10 + pulse * 3)
-        inner_alpha = int(140 + pulse * 60)
+        inner_radius = max(1, int((10 + pulse * 3) * MOON_SHARD_GLOW_SCALE))
+        inner_alpha = int((140 + pulse * 60) * MOON_SHARD_GLOW_ALPHA_SCALE)
         inner_surf = pygame.Surface((inner_radius * 2, inner_radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(
             inner_surf,

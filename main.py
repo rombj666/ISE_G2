@@ -201,6 +201,8 @@ def main():
     game_state = "menu"
     opening_dialogue_seen = False
     show_player_debug_overlay = False
+    player_only_draw_mode = False
+    show_moon_shard = True
     killed_enemy_ids = set()
     boss_section_locked = False
     boss_room_debug_printed = False
@@ -232,6 +234,7 @@ def main():
         player.vel_y = 0
         player.is_dashing = False
         player.is_attacking = False
+        player.clear_attack_animation()
         player.is_auto_grappling = False
         player.is_blocking = False
         player.is_parrying = False
@@ -661,6 +664,23 @@ def main():
                     show_player_debug_overlay = not show_player_debug_overlay
                     continue
 
+                if event.key == pygame.K_F9:
+                    player_only_draw_mode = not player_only_draw_mode
+                    print(
+                        "[PLAYER DRAW ISOLATION]",
+                        "ON" if player_only_draw_mode else "OFF",
+                    )
+                    print("Cause: moon shard/effect overlap")
+                    continue
+
+                if event.key == pygame.K_F10 and not dev_teleport.visible:
+                    show_moon_shard = not show_moon_shard
+                    print(
+                        "[MOON SHARD DRAW]",
+                        "ON" if show_moon_shard else "OFF",
+                    )
+                    continue
+
                 if dev_teleport.visible:
                     if event.key == pygame.K_ESCAPE:
                         dev_teleport.close()
@@ -965,11 +985,12 @@ def main():
                 pygame.draw.circle(screen, (235, 220, 255), anchor_pos, 6)
                 pygame.draw.circle(screen, (205, 160, 255), anchor_pos, 30, 2)
 
-        for domain in time_freeze_domains:
-            domain.draw(screen, camera)
+        if not player_only_draw_mode:
+            for domain in time_freeze_domains:
+                domain.draw(screen, camera)
 
-        for anchor_loop in soul_anchor_loops:
-            anchor_loop.draw(screen, camera)
+            for anchor_loop in soul_anchor_loops:
+                anchor_loop.draw(screen, camera)
 
         for coin in coins:
             coin.draw(screen, camera)
@@ -994,24 +1015,29 @@ def main():
             normal_enemy.draw(screen, camera)
         for archer in archers:
             archer.draw(screen, camera)
-        player.draw(screen, camera)
-        # Moon shard renders on top so its glow doesn't get hidden behind the player.
-        moon_shard.draw(screen, camera)
+        if not player_only_draw_mode and show_moon_shard:
+            # Decorative companion stays behind the player and clear of the torso.
+            moon_shard.draw(screen, camera)
+        if player_only_draw_mode:
+            player.draw_player_image_only(screen, camera)
+        else:
+            player.draw(screen, camera)
 
-        for projectile in projectiles:
-            projectile.draw(screen, camera)
+        if not player_only_draw_mode:
+            for projectile in projectiles:
+                projectile.draw(screen, camera)
 
-        for arrow in archer_arrows:
-            arrow.draw(screen, camera)
+            for arrow in archer_arrows:
+                arrow.draw(screen, camera)
 
-        for hit_effect in projectile_hit_effects:
-            hit_effect.draw(screen, camera)
+            for hit_effect in projectile_hit_effects:
+                hit_effect.draw(screen, camera)
 
-        for blade in active_orbit_blades:
-            blade.draw(screen, camera)
+            for blade in active_orbit_blades:
+                blade.draw(screen, camera)
 
-        for effect in active_skill_effects:
-            effect.draw(screen, camera)
+            for effect in active_skill_effects:
+                effect.draw(screen, camera)
 
         weapon = get_weapon(player.current_weapon_id)
         hide_custom_weapon_attack_visuals = (
@@ -1022,6 +1048,7 @@ def main():
             player.is_attacking and
             weapon["weapon_type"] != "projectile" and
             DEBUG_DRAW_HITBOXES and
+            not player_only_draw_mode and
             not hide_custom_weapon_attack_visuals
         ):
             pygame.draw.rect(screen, (70, 140, 255), camera.apply_rect(player.get_attack_hitbox()), 2)
@@ -1061,15 +1088,19 @@ def main():
             pixel_surface = pygame.transform.scale(small_surface, (SCREEN_WIDTH, SCREEN_HEIGHT))
             window.blit(pixel_surface, (0, 0))
             dialogue.draw(window)
-            if DEBUG_MODE or show_player_debug_overlay:
+            if not player_only_draw_mode and (DEBUG_MODE or show_player_debug_overlay):
                 draw_player_debug_position(window, player)
             # Draw dev tools after pixel scaling so F3 text stays readable.
             dev_teleport.draw(window)
+            if dev_teleport.visible and not player_only_draw_mode:
+                player.draw_debug_animation_status(window)
         else:
             dialogue.draw(screen)
             # Dev teleport overlay is drawn last so it sits on top of everything.
             dev_teleport.draw(screen)
-            if DEBUG_MODE or show_player_debug_overlay:
+            if dev_teleport.visible and not player_only_draw_mode:
+                player.draw_debug_animation_status(screen)
+            if not player_only_draw_mode and (DEBUG_MODE or show_player_debug_overlay):
                 draw_player_debug_position(screen, player)
             window.blit(screen, (0, 0))
 
@@ -1588,6 +1619,7 @@ def kill_player_instantly(player):
     player.vel_y = 0
     player.is_dashing = False
     player.is_attacking = False
+    player.clear_attack_animation()
     player.is_auto_grappling = False
     player.is_blocking = False
     player.is_parrying = False
